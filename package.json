@@ -20,7 +20,9 @@
     "tcomb": "*"
   },
   "devDependencies": {
-    "mocha": "*"
+    "mocha": "*",
+    "react": "*",
+    "sinon": "*"
   },
   "tags": [
     "validation"

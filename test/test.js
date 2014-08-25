@@ -2,6 +2,9 @@
 
 var assert = require('assert');
 var v = require('../index');
+var React = require('react');
+var sinon = require('sinon');
+
 var t = v.t;
 var validate = v.validate;
 
@@ -304,25 +307,53 @@ describe('validate', function () {
 
     describe('custom messages', function () {
 
+      var p;
       var messages = {
         ':input':  'product should be an object',
         name:       'name should be a string',                  
-        desc:       'desc should be a string',
+        desc:       'desc should be an optional string',
         home:       {':type': 'home should be a string', ':predicate': 'home should be an URL'},
-        shippings:  {':input': 'shippings should be an array', ':type': 'should be a string'},       
+        shippings:  {':input': 'shippings should be a list of strings', ':type': 'every element of shippings should be a string'},       
         category:   'category should be a valid enum',         
-        price:      {':dispatch': 'price should be expressed in dollars or in another currency', 0: 'price should be a number', 1: {':struct': 'price should be an object', currency: 'currency should be a currency', amount: 'amount should be a positive number'}},
+        price:      {':dispatch': 'price should be expressed in dollars or in another currency', 0: 'price should be a positive number', 1: {':struct': 'price should be an object', currency: 'currency should be a currency', amount: 'amount should be a positive number'}},
         dim:        {':input': 'dim should be an array of length 2', 0: 'dim.width should be a number', 1: 'dim.height should be a number'}
       };
 
       it('should return custom messages', function () {
-        var p = getPatch({name: null});
+        p = getPatch({name: null});
         eqv(validate(p, Product, {messages: messages}), validation('name should be a string', ['root', 'name']));
+        p = getPatch({desc: 1});
+        eqv(validate(p, Product, {messages: messages}), validation('desc should be an optional string', ['root', 'desc']));
+        p = getPatch({home: 1});
+        eqv(validate(p, Product, {messages: messages}), validation('home should be a string', ['root', 'home']));
+        p = getPatch({home: 'a'});
+        eqv(validate(p, Product, {messages: messages}), validation('home should be an URL', ['root', 'home']));
+        p = getPatch({shippings: 1});
+        eqv(validate(p, Product, {messages: messages}), validation('shippings should be a list of strings', ['root', 'shippings']));
+        p = getPatch({shippings: [1]});
+        eqv(validate(p, Product, {messages: messages}), validation('every element of shippings should be a string', ['root', 'shippings', 0]));
+        p = getPatch({category: 1});
+        eqv(validate(p, Product, {messages: messages}), validation('category should be a valid enum', ['root', 'category']));
+        p = getPatch({price: 'a'});
+        eqv(validate(p, Product, {messages: messages}), validation('price should be expressed in dollars or in another currency', ['root', 'price']));
+        p = getPatch({price: -1});
+        eqv(validate(p, Product, {messages: messages}), validation('price should be a positive number', ['root', 'price']));
+        p = getPatch({dim: -1});
+        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['root', 'dim']));
+        p = getPatch({dim: []});
+        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['root', 'dim']));
+        p = getPatch({dim: [1]});
+        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['root', 'dim']));
+        p = getPatch({dim: [1, 2, 3]});
+        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['root', 'dim']));
+        p = getPatch({dim: [1, 'a']});
+        eqv(validate(p, Product, {messages: messages}), validation('dim.height should be a number', ['root', 'dim', 1]));
       });
     });
 
     describe('form validation', function () {
 
+      var p;
       var messages = {
         "name": "name",
         "desc": "desc",
@@ -333,20 +364,90 @@ describe('validate', function () {
         "dim": "dim"
       };
 
-      it('should return custom messages', function () {
-        var p = getPatch({name: null});
+      it('should return the name of the prop', function () {
+        p = getPatch({name: null});
         eqv(validate(p, Product, {messages: messages}), validation('name', ['root', 'name']));
-      });
-    });
-
-    describe('path detection', function () {
-      it('should return the error path', function () {
-        var p = getPatch({name: null});
-        eqv(validate(p, Product, {messages: ':xpath'}), validation('root/name', ['root', 'name']));
+        p = getPatch({desc: 1});
+        eqv(validate(p, Product, {messages: messages}), validation('desc', ['root', 'desc']));
+        p = getPatch({home: 1});
+        eqv(validate(p, Product, {messages: messages}), validation('home', ['root', 'home']));
+        p = getPatch({home: 'a'});
+        eqv(validate(p, Product, {messages: messages}), validation('home', ['root', 'home']));
+        p = getPatch({shippings: 1});
+        eqv(validate(p, Product, {messages: messages}), validation('shippings', ['root', 'shippings']));
+        p = getPatch({shippings: [1]});
+        eqv(validate(p, Product, {messages: messages}), validation('shippings', ['root', 'shippings', 0]));
+        p = getPatch({category: 1});
+        eqv(validate(p, Product, {messages: messages}), validation('category', ['root', 'category']));
+        p = getPatch({price: 'a'});
+        eqv(validate(p, Product, {messages: messages}), validation('price', ['root', 'price']));
+        p = getPatch({price: -1});
+        eqv(validate(p, Product, {messages: messages}), validation('price', ['root', 'price']));
+        p = getPatch({dim: -1});
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['root', 'dim']));
+        p = getPatch({dim: []});
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['root', 'dim']));
+        p = getPatch({dim: [1]});
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['root', 'dim']));
+        p = getPatch({dim: [1, 2, 3]});
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['root', 'dim']));
+        p = getPatch({dim: [1, 'a']});
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['root', 'dim', 1]));
       });
     });
 
     describe('React propTypes', function () {
+
+      function toPropTypes(Struct) {
+        var propTypes = {};
+        var props = Struct.meta.props;
+        Object.keys(props).sort().forEach(function (k) {
+          propTypes[k] = function (values, name, component) {
+            var T = props[name];
+            var value = values[name];
+            return validate(value, T, {path: ['product', k]}).firstError();
+          }
+        });
+        return propTypes;
+      }
+
+      var p = {desc: 1};
+
+      var ProductComponent = React.createClass({
+        displayName: 'ProductComponent',
+        propTypes: toPropTypes(Product),
+        render: function () {
+          return React.DOM.div();
+        }
+      });
+
+      it('should call console.warn when there is an error', function () {
+        var spy = sinon.spy();
+        var warn = console.warn;
+        console.warn = spy;
+        React.renderComponentToString(ProductComponent(p));
+
+        var calls = [
+          spy.getCall(0).args[0],
+          spy.getCall(1).args[0],
+          spy.getCall(2).args[0],
+          spy.getCall(3).args[0],
+          spy.getCall(4).args[0],
+          spy.getCall(5).args[0],
+          spy.getCall(6).args[0]
+        ].sort();
+
+        eq(calls[0], 'Warning: product/category is `undefined`, should be a `Category`');
+        eq(calls[1], 'Warning: product/desc is `1`, should be a `Str`');
+        eq(calls[2], 'Warning: product/dim is `undefined`, should be an `Arr` of length `2`');
+        eq(calls[3], 'Warning: product/home is `undefined`, should be a `Str`');
+        eq(calls[4], 'Warning: product/name is `undefined`, should be a `Str`');
+        eq(calls[5], 'Warning: product/price is `undefined`, should be a `Price`');
+        eq(calls[6], 'Warning: product/shippings is `undefined`, should be an `Arr`');
+
+        console.warn = warn;
+      });
+
     });
 
   });
