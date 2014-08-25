@@ -43,14 +43,18 @@ var Ok = new Validation({errors: null});
 //
 // utils
 //
-
 function toXPath(path) {
-  var xpath = path[0] || '';
-  for (var i = 1, len = path.length ; i < len ; i++ ) {
-    var el = path[i];
-    xpath += (Num.is(el) ? '[' + el  + ']' : '/' + el)
+  var len;
+  if (path && (len = path.length)) {
+    var ret = '';
+    var el;
+    for (var i = 0 ; i < len ; i++ ) {
+      el = path[i];
+      ret += Num.is(el) ? '[' + el + ']' : (i > 0 ? '/' : '') + el;
+    }
+    return ret;
   }
-  return xpath;
+  return 'value';
 }
 
 function ko(message, path) {
@@ -237,7 +241,7 @@ function validate(value, type, opts) {
   assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `validate`, expected a type', type);
   assert(maybe(Arr).is(opts.path), 'Invalid argument `opts.path` of value `%j` supplied to `validate`, expected an `Arr`', opts.path);
 
-  opts.path = opts.path || ['root'];
+  opts.path = opts.path || [];
 
   var kind = type.meta.kind;
   switch (kind) {

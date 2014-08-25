@@ -125,11 +125,14 @@ describe('toXPath', function () {
 
   var toXPath = v.toXPath;
   
-  it('should handle object props', function () {
-    eq(toXPath(['model', 'prop', 1]), 'model/prop[1]');
-  });
-  it('should handle array indexes', function () {
-    eq(toXPath(['model', 1, 'prop']), 'model[1]/prop');
+  it('should format an array to xpath', function () {
+    eq(toXPath(), 'value');
+    eq(toXPath([]), 'value');
+    eq(toXPath(['x']), 'x');
+    eq(toXPath([1]), '[1]');
+    eq(toXPath(['x', 1]), 'x[1]');
+    eq(toXPath([1, 'x']), '[1]/x');
+    eq(toXPath(['x', 'y', 1]), 'x/y[1]');
   });
 });
 
@@ -144,13 +147,13 @@ describe('validate', function () {
   describe('primitives', function () {
     it('should validate', function () {
       eqv(validate('a', Str), v.Ok);
-      eqv(validate(1, Str), validation('root is `1`, should be a `Str`', ['root']));
+      eqv(validate(1, Str), validation('value is `1`, should be a `Str`', []));
     });
     it('should handle `path` argument', function () {
       eqv(validate(1, Str, {path: ['model']}), validation('model is `1`, should be a `Str`', ['model']));
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, Str, {messages: 'mymessage'}), validation('mymessage', ['root']));
+      eqv(validate(1, Str, {messages: 'mymessage'}), validation('mymessage', []));
       eqv(validate(1, Str, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
     });
   });
@@ -158,13 +161,13 @@ describe('validate', function () {
   describe('enums', function () {
     it('should validate', function () {
       eqv(validate('audio', Category), v.Ok);
-      eqv(validate(1, Category), validation('root is `1`, should be a `Category`', ['root']));
+      eqv(validate(1, Category), validation('value is `1`, should be a `Category`', []));
     });
     it('should handle `path` argument', function () {
       eqv(validate(1, Category, {path: ['model']}), validation('model is `1`, should be a `Category`', ['model']));
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, Category, {messages: 'mymessage'}), validation('mymessage', ['root']));
+      eqv(validate(1, Category, {messages: 'mymessage'}), validation('mymessage', []));
       eqv(validate(1, Category, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
     });
   });
@@ -172,22 +175,22 @@ describe('validate', function () {
   describe('list', function () {
     it('should validate', function () {
       eqv(validate(['a'], Shippings), v.Ok);
-      eqv(validate(1, Shippings), validation('root is `1`, should be an `Arr`', ['root']));
-      eqv(validate([1], Shippings), validation('root[0] is `1`, should be a `Str`', ['root', 0]));
+      eqv(validate(1, Shippings), validation('value is `1`, should be an `Arr`', []));
+      eqv(validate([1], Shippings), validation('[0] is `1`, should be a `Str`', [0]));
     });
     it('should handle `path` argument', function () {
       eqv(validate(1, Shippings, {path: ['model']}), validation('model is `1`, should be an `Arr`', ['model']));
       eqv(validate([1], Shippings, {path: ['model']}), validation('model[0] is `1`, should be a `Str`', ['model', 0]));
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, Shippings, {messages: 'mymessage'}), validation('mymessage', ['root']));
-      eqv(validate([1], Shippings, {messages: 'mymessage'}), validation('mymessage', ['root', 0]));
+      eqv(validate(1, Shippings, {messages: 'mymessage'}), validation('mymessage', []));
+      eqv(validate([1], Shippings, {messages: 'mymessage'}), validation('mymessage', [0]));
       eqv(validate(1, Shippings, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
       eqv(validate([1], Shippings, {path: ['model'], messages: ':xpath mymessage'}), validation('model[0] mymessage', ['model', 0]));
-      eqv(validate(1, Shippings, {messages: {':input': 'should be a list'}}), validation('should be a list', ['root']));
-      eqv(validate([1], Shippings, {messages: {':input': 'should be a list'}}), validation('root[0] is `1`, should be a `Str`', ['root', 0]));
-      eqv(validate([1], Shippings, {messages: {':type': 'should be a string'}}), validation('should be a string', ['root', 0]));
-      eqv(validate([1], Shippings, {messages: {':type': ':xpath should be a string'}}), validation('root[0] should be a string', ['root', 0]));
+      eqv(validate(1, Shippings, {messages: {':input': 'should be a list'}}), validation('should be a list', []));
+      eqv(validate([1], Shippings, {messages: {':input': 'should be a list'}}), validation('[0] is `1`, should be a `Str`', [0]));
+      eqv(validate([1], Shippings, {messages: {':type': 'should be a string'}}), validation('should be a string', [0]));
+      eqv(validate([1], Shippings, {messages: {':type': ':xpath should be a string'}}), validation('[0] should be a string', [0]));
     });
   });
 
@@ -195,13 +198,13 @@ describe('validate', function () {
     it('should validate', function () {
       eqv(validate(null, Description), v.Ok);
       eqv(validate('a', Description), v.Ok);
-      eqv(validate(1, Description), validation('root is `1`, should be a `Str`', ['root']));
+      eqv(validate(1, Description), validation('value is `1`, should be a `Str`', []));
     });
     it('should handle `path` argument', function () {
       eqv(validate(1, Description, {path: ['model']}), validation('model is `1`, should be a `Str`', ['model']));
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, Description, {messages: 'mymessage'}), validation('mymessage', ['root']));
+      eqv(validate(1, Description, {messages: 'mymessage'}), validation('mymessage', []));
       eqv(validate(1, Description, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
     });
   });
@@ -215,57 +218,57 @@ describe('validate', function () {
 
     it('should validate', function () {
       eqv(validate({x: 0, y: 0}, Point), v.Ok);
-      eqv(validate(null, Point), validation('root is `null`, should be an `Obj`', ['root']));
-      eqv(validate({x: 0}, Point), validation('root/y is `undefined`, should be a `Num`', ['root', 'y']));
-      eqv(validate({x: 0, y: 'a'}, Point), validation('root/y is `"a"`, should be a `Num`', ['root', 'y']));
+      eqv(validate(null, Point), validation('value is `null`, should be an `Obj`', []));
+      eqv(validate({x: 0}, Point), validation('y is `undefined`, should be a `Num`', ['y']));
+      eqv(validate({x: 0, y: 'a'}, Point), validation('y is `"a"`, should be a `Num`', ['y']));
     });
     it('should handle `path` argument', function () {
       eqv(validate(1, Point, {path: ['model']}), validation('model is `1`, should be an `Obj`', ['model']));
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, Point, {messages: 'mymessage'}), validation('mymessage', ['root']));
-      eqv(validate({x: 0}, Point, {messages: 'mymessage'}), validation('mymessage', ['root', 'y']));
+      eqv(validate(1, Point, {messages: 'mymessage'}), validation('mymessage', []));
+      eqv(validate({x: 0}, Point, {messages: 'mymessage'}), validation('mymessage', ['y']));
       eqv(validate(1, Point, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
       eqv(validate({x: 0}, Point, {path: ['model'], messages: ':xpath mymessage'}), validation('model/y mymessage', ['model', 'y']));
-      eqv(validate(1, Point, {messages: {':input': 'should be an obj'}}), validation('should be an obj', ['root']));
-      eqv(validate({x: 0, y: 'a'}, Point, {messages: {'y': 'y should be an obj'}}), validation('y should be an obj', ['root', 'y']));
+      eqv(validate(1, Point, {messages: {':input': 'should be an obj'}}), validation('should be an obj', []));
+      eqv(validate({x: 0, y: 'a'}, Point, {messages: {'y': 'y should be an obj'}}), validation('y should be an obj', ['y']));
     });
   });
 
   describe('subtype', function () {
     it('should validate', function () {
       eqv(validate('http://gcanti.github.io', URL), v.Ok);
-      eqv(validate(1, URL), validation('root is `1`, should be a `Str`', ['root']));
-      eqv(validate('a', URL), validation('root is `"a"`, should be truthy for the predicate', ['root']));
+      eqv(validate(1, URL), validation('value is `1`, should be a `Str`', []));
+      eqv(validate('a', URL), validation('value is `"a"`, should be truthy for the predicate', []));
     });
     it('should handle `path` argument', function () {
       eqv(validate(1, URL, {path: ['model']}), validation('model is `1`, should be a `Str`', ['model']));
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, URL, {messages: 'mymessage'}), validation('mymessage', ['root']));
+      eqv(validate(1, URL, {messages: 'mymessage'}), validation('mymessage', []));
       eqv(validate(1, URL, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
-      eqv(validate(1, URL, {messages: {':type': 'should be a string'}}), validation('should be a string', ['root']));
-      eqv(validate('a', URL, {messages: {':predicate': 'should be a URL'}}), validation('should be a URL', ['root']));
+      eqv(validate(1, URL, {messages: {':type': 'should be a string'}}), validation('should be a string', []));
+      eqv(validate('a', URL, {messages: {':predicate': 'should be a URL'}}), validation('should be a URL', []));
     });
   });
 
   describe('tuple', function () {
     it('should validate', function () {
       eqv(validate([1, 2], Dimension), v.Ok);
-      eqv(validate(1, Dimension), validation('root is `1`, should be an `Arr` of length `2`', ['root']));
-      eqv(validate([1], Dimension), validation('root is `[1]`, should be an `Arr` of length `2`', ['root']));
-      eqv(validate([1, 2, 3], Dimension), validation('root is `[1,2,3]`, should be an `Arr` of length `2`', ['root']));
-      eqv(validate([1, 'a'], Dimension), validation('root[1] is `"a"`, should be a `Num`', ['root', 1]));
+      eqv(validate(1, Dimension), validation('value is `1`, should be an `Arr` of length `2`', []));
+      eqv(validate([1], Dimension), validation('value is `[1]`, should be an `Arr` of length `2`', []));
+      eqv(validate([1, 2, 3], Dimension), validation('value is `[1,2,3]`, should be an `Arr` of length `2`', []));
+      eqv(validate([1, 'a'], Dimension), validation('[1] is `"a"`, should be a `Num`', [1]));
     });
     it('should handle `path` argument', function () {
       eqv(validate(1, Dimension, {path: ['model']}), validation('model is `1`, should be an `Arr` of length `2`', ['model']));
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, Dimension, {messages: 'mymessage'}), validation('mymessage', ['root']));
+      eqv(validate(1, Dimension, {messages: 'mymessage'}), validation('mymessage', []));
       eqv(validate(1, Dimension, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
-      eqv(validate(1, Dimension, {messages: {':input': 'should be an array'}}), validation('should be an array', ['root']));
-      eqv(validate([1], Dimension, {messages: {':input': 'should be an array'}}), validation('should be an array', ['root']));
-      eqv(validate([1, 'a'], Dimension, {messages: {'1': 'should be a number'}}), validation('should be a number', ['root', 1]));
+      eqv(validate(1, Dimension, {messages: {':input': 'should be an array'}}), validation('should be an array', []));
+      eqv(validate([1], Dimension, {messages: {':input': 'should be an array'}}), validation('should be an array', []));
+      eqv(validate([1, 'a'], Dimension, {messages: {'1': 'should be a number'}}), validation('should be a number', [1]));
     });
   });
 
@@ -273,19 +276,19 @@ describe('validate', function () {
     it('should validate', function () { 
       eqv(validate(1, Price), v.Ok);
       eqv(validate({currency: 'EUR', amount: 100}, Price), {errors: null});
-      eqv(validate('a', Price), validation('root is `"a"`, should be a `Price`', ['root']));
+      eqv(validate('a', Price), validation('value is `"a"`, should be a `Price`', []));
       eqv(validate({}, Price), {errors: [
-        error('root/currency is `undefined`, should be a `Str`', ['root', 'currency']),
-        error('root/amount is `undefined`, should be a `Num`', ['root', 'amount'])
+        error('currency is `undefined`, should be a `Str`', ['currency']),
+        error('amount is `undefined`, should be a `Num`', ['amount'])
       ]});
     });
     it('should handle `path` argument', function () {
       eqv(validate('a', Price, {path: ['model']}), validation('model is `"a"`, should be a `Price`', ['model']));
     });
     it('should handle `message` argument', function () {
-      eqv(validate('a', Price, {messages: 'mymessage'}), validation('mymessage', ['root']));
+      eqv(validate('a', Price, {messages: 'mymessage'}), validation('mymessage', []));
       eqv(validate('a', Price, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
-      eqv(validate('a', Price, {messages: {':dispatch': 'should be a Price'}}), validation('should be a Price', ['root']));
+      eqv(validate('a', Price, {messages: {':dispatch': 'should be a Price'}}), validation('should be a Price', []));
     });
   });
 
@@ -321,33 +324,33 @@ describe('validate', function () {
 
       it('should return custom messages', function () {
         p = getPatch({name: null});
-        eqv(validate(p, Product, {messages: messages}), validation('name should be a string', ['root', 'name']));
+        eqv(validate(p, Product, {messages: messages}), validation('name should be a string', ['name']));
         p = getPatch({desc: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('desc should be an optional string', ['root', 'desc']));
+        eqv(validate(p, Product, {messages: messages}), validation('desc should be an optional string', ['desc']));
         p = getPatch({home: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('home should be a string', ['root', 'home']));
+        eqv(validate(p, Product, {messages: messages}), validation('home should be a string', ['home']));
         p = getPatch({home: 'a'});
-        eqv(validate(p, Product, {messages: messages}), validation('home should be an URL', ['root', 'home']));
+        eqv(validate(p, Product, {messages: messages}), validation('home should be an URL', ['home']));
         p = getPatch({shippings: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('shippings should be a list of strings', ['root', 'shippings']));
+        eqv(validate(p, Product, {messages: messages}), validation('shippings should be a list of strings', ['shippings']));
         p = getPatch({shippings: [1]});
-        eqv(validate(p, Product, {messages: messages}), validation('every element of shippings should be a string', ['root', 'shippings', 0]));
+        eqv(validate(p, Product, {messages: messages}), validation('every element of shippings should be a string', ['shippings', 0]));
         p = getPatch({category: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('category should be a valid enum', ['root', 'category']));
+        eqv(validate(p, Product, {messages: messages}), validation('category should be a valid enum', ['category']));
         p = getPatch({price: 'a'});
-        eqv(validate(p, Product, {messages: messages}), validation('price should be expressed in dollars or in another currency', ['root', 'price']));
+        eqv(validate(p, Product, {messages: messages}), validation('price should be expressed in dollars or in another currency', ['price']));
         p = getPatch({price: -1});
-        eqv(validate(p, Product, {messages: messages}), validation('price should be a positive number', ['root', 'price']));
+        eqv(validate(p, Product, {messages: messages}), validation('price should be a positive number', ['price']));
         p = getPatch({dim: -1});
-        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['root', 'dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['dim']));
         p = getPatch({dim: []});
-        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['root', 'dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['dim']));
         p = getPatch({dim: [1]});
-        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['root', 'dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['dim']));
         p = getPatch({dim: [1, 2, 3]});
-        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['root', 'dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['dim']));
         p = getPatch({dim: [1, 'a']});
-        eqv(validate(p, Product, {messages: messages}), validation('dim.height should be a number', ['root', 'dim', 1]));
+        eqv(validate(p, Product, {messages: messages}), validation('dim.height should be a number', ['dim', 1]));
       });
     });
 
@@ -366,33 +369,33 @@ describe('validate', function () {
 
       it('should return the name of the prop', function () {
         p = getPatch({name: null});
-        eqv(validate(p, Product, {messages: messages}), validation('name', ['root', 'name']));
+        eqv(validate(p, Product, {messages: messages}), validation('name', ['name']));
         p = getPatch({desc: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('desc', ['root', 'desc']));
+        eqv(validate(p, Product, {messages: messages}), validation('desc', ['desc']));
         p = getPatch({home: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('home', ['root', 'home']));
+        eqv(validate(p, Product, {messages: messages}), validation('home', ['home']));
         p = getPatch({home: 'a'});
-        eqv(validate(p, Product, {messages: messages}), validation('home', ['root', 'home']));
+        eqv(validate(p, Product, {messages: messages}), validation('home', ['home']));
         p = getPatch({shippings: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('shippings', ['root', 'shippings']));
+        eqv(validate(p, Product, {messages: messages}), validation('shippings', ['shippings']));
         p = getPatch({shippings: [1]});
-        eqv(validate(p, Product, {messages: messages}), validation('shippings', ['root', 'shippings', 0]));
+        eqv(validate(p, Product, {messages: messages}), validation('shippings', ['shippings', 0]));
         p = getPatch({category: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('category', ['root', 'category']));
+        eqv(validate(p, Product, {messages: messages}), validation('category', ['category']));
         p = getPatch({price: 'a'});
-        eqv(validate(p, Product, {messages: messages}), validation('price', ['root', 'price']));
+        eqv(validate(p, Product, {messages: messages}), validation('price', ['price']));
         p = getPatch({price: -1});
-        eqv(validate(p, Product, {messages: messages}), validation('price', ['root', 'price']));
+        eqv(validate(p, Product, {messages: messages}), validation('price', ['price']));
         p = getPatch({dim: -1});
-        eqv(validate(p, Product, {messages: messages}), validation('dim', ['root', 'dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim']));
         p = getPatch({dim: []});
-        eqv(validate(p, Product, {messages: messages}), validation('dim', ['root', 'dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim']));
         p = getPatch({dim: [1]});
-        eqv(validate(p, Product, {messages: messages}), validation('dim', ['root', 'dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim']));
         p = getPatch({dim: [1, 2, 3]});
-        eqv(validate(p, Product, {messages: messages}), validation('dim', ['root', 'dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim']));
         p = getPatch({dim: [1, 'a']});
-        eqv(validate(p, Product, {messages: messages}), validation('dim', ['root', 'dim', 1]));
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim', 1]));
       });
     });
 
@@ -453,3 +456,4 @@ describe('validate', function () {
   });
 
 });
+
