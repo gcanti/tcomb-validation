@@ -193,7 +193,8 @@ function validateUnion(value, type, opts) {
     return ko(message, opts.path);
   }
 
-  var validation = validate(value, ctor, opts);
+  var i = type.meta.types.indexOf(ctor);
+  var validation = validate(value, ctor, {path: opts.path, messages: getMessage(opts.messages, i)});
   if (!validation.isValid()) {
     return validation;
   }
