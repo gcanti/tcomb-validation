@@ -18,38 +18,38 @@ var assert = t.assert;
 var getName = t.getName;
 var format = t.format;
 
+//
+// Validation model
+//
+
 var Validation = struct({
-  value: Any,
   errors: maybe(list(Err))
 }, 'Validation');
 
 Validation.prototype.isValid = function() {
-  return this.errors && this.errors.length ? false : true;
+  return !(this.errors && this.errors.length);
 };
 
-Validation.of = function (value, errors) {
+Validation.prototype.firstError = function() {
+  return this.isValid() ? null : this.errors[0];
+};
+
+// cache ok result
+var Ok = new Validation({errors: null});
+
+//
+// utils
+//
+
+function ko(message, path) {
   return new Validation({
-    value: value,
-    errors: errors || null
+    errors: [
+      new Error(formatError(message, {path: path}))
+    ]
   });
-};
-
-// TODO: rename
-var primitives = {
-  any: 1,
-  primitive: 1,
-  enums: 1
-};
-
-function getMessage(messages, key, defaultMessage) {
-  if (Obj.is(messages) && messages.hasOwnProperty(key)) {
-    return messages[key];
-  } else if (Str.is(messages)) {
-    return messages;
-  }
-  return defaultMessage;
 }
 
+// TODO: optimize
 function formatError(message, params) {
   params = params || {};
   for (var param in params) {
@@ -60,21 +60,32 @@ function formatError(message, params) {
   return message;
 }
 
-function getError(message, params) {
-  return new Error(formatError(message, params));
+function getMessage(messages, key, defaultMessage) {
+  if (Obj.is(messages) && messages.hasOwnProperty(key)) {
+    return messages[key];
+  } else if (Str.is(messages)) {
+    return messages;
+  }
+  return defaultMessage;
 }
 
+//
+// validation functions
+// one for each kind expect for `any`, `primitive`, `enums` 
+// which are handled the same way
+//
+
 function validatePrimitive(value, type, path, message) {
-  assert(isType(type) && type.meta.kind in primitives);
+  assert(isType(type) && type.meta.kind in {any: 1, primitive: 1, enums: 1});
   assert(maybe(Str).is(message));
 
   path = path || 'root';
   
   if (!type.is(value)) {
     message = message || format(':path is `%j`, should be a `%s`', value, getName(type));
-    return Validation.of(value, [getError(message, {path: path})]);
+    return ko(message, path);
   }
-  return Validation.of(value);
+  return Ok;
 }
 
 function validateStruct(value, type, path, messages) {
@@ -86,7 +97,7 @@ function validateStruct(value, type, path, messages) {
 
   if (!isValid) {
     var message = getMessage(messages, ':struct', format(':path is `%j`, should be an `Obj`', value));
-    return Validation.of(value, [getError(message, {path: path})]);
+    return ko(message, path);
   }
 
   var errors = [];
@@ -102,10 +113,10 @@ function validateStruct(value, type, path, messages) {
   }
 
   if (!isValid) {
-    return Validation.of(value, errors);
+    return new Validation({errors: errors});
   }
 
-  return Validation.of(value);
+  return Ok;
 }
 
 function validateMaybe(value, type, path, messages) {
@@ -115,7 +126,7 @@ function validateMaybe(value, type, path, messages) {
     return validate(value, type.meta.type, path, messages);
   }
 
-  return Validation.of(value);
+  return Ok;
 }
 
 function validateSubtype(value, type, path, messages) {
@@ -131,10 +142,10 @@ function validateSubtype(value, type, path, messages) {
   var predicate = type.meta.predicate;
   if (!predicate(value)) {
     var message = getMessage(messages, ':predicate', format(':path is `%j`, should be truthy for the predicate`', value));
-    return Validation.of(value, [getError(message, {path: path})]);
+    return ko(message, path);
   }
 
-  return Validation.of(value);
+  return Ok;
 }
 
 function validateList(value, type, path, messages) {
@@ -146,7 +157,7 @@ function validateList(value, type, path, messages) {
 
   if (!isValid) {
     var message = getMessage(messages, ':list', format(':path is `%j`, should be an `Arr`', value));
-    return Validation.of(value, [getError(message, {path: path})]);
+    return ko(message, path);
   }
 
   var errors = [];
@@ -159,10 +170,10 @@ function validateList(value, type, path, messages) {
   }
 
   if (!isValid) {
-    return Validation.of(value, errors);
+    return new Validation({errors: errors});
   }
 
-  return Validation.of(value);
+  return Ok;
 }
 
 function validateUnion(value, type, path, messages) {
@@ -175,7 +186,7 @@ function validateUnion(value, type, path, messages) {
 
   if (!Func.is(ctor)) {
     var message = getMessage(messages, ':dispatch', format(':path is `%j`, should be a `%s`', value, getName(type)));
-    return Validation.of(value, [getError(message, {path: path})]);
+    return ko(message, path);
   }
 
   var validation = validate(value, ctor, path, messages);
@@ -183,7 +194,7 @@ function validateUnion(value, type, path, messages) {
     return validation;
   }
 
-  return Validation.of(value);
+  return Ok;
 }
 
 function validateTuple(value, type, path, messages) {
@@ -197,7 +208,7 @@ function validateTuple(value, type, path, messages) {
 
   if (!isValid) {
     var message = getMessage(messages, ':tuple', format(':path is `%j`, should be an `Arr` of length `%s`', value, len));
-    return Validation.of(value, [getError(message, {path: path})]);
+    return ko(message, path);
   }
 
   var errors = [];
@@ -210,10 +221,10 @@ function validateTuple(value, type, path, messages) {
   }
 
   if (!isValid) {
-    return Validation.of(value, errors);
+    return new Validation({errors: errors});
   }
 
-  return Validation.of(value);
+  return Ok;
 }
 
 function validate(value, type, path, messages) {
@@ -239,13 +250,13 @@ function validate(value, type, path, messages) {
     case 'tuple' :
       return validateTuple(value, type, path, messages);
     default :
-      fail('Invalid kind `%s` supplied to `validate`, expected an handled kind', kind);
+      t.fail('Invalid kind `%s` supplied to `validate`, expected an handled kind', kind);
   }
 }
 
 module.exports = {
 
-  // re export tcomb for convenience
+  // export tcomb for convenience
   t: t,
 
   // utils
