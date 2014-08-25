@@ -19,25 +19,19 @@ var getName = t.getName;
 var format = t.format;
 
 var Validation = struct({
-  isValid: Bool,
   value: Any,
-  errors: maybe(list(Err)) // null if isValid === true
+  errors: maybe(list(Err))
 }, 'Validation');
 
-Validation.of = function (isValid, value, errors) {
+Validation.prototype.isValid = function() {
+  return this.errors && this.errors.length ? false : true;
+};
+
+Validation.of = function (value, errors) {
   return new Validation({
-    isValid: isValid, 
     value: value,
     errors: errors || null
   });
-};
-
-Validation.ko = function (value, errors) {
-  return Validation.of(false, value, errors);
-};
-
-Validation.ok = function (value) {
-  return Validation.of(true, value);
 };
 
 // TODO: rename
@@ -78,9 +72,9 @@ function validatePrimitive(value, type, path, message) {
   
   if (!type.is(value)) {
     message = message || format(':path is `%j`, should be a `%s`', value, getName(type));
-    return Validation.ko(value, [getError(message, {path: path})]);
+    return Validation.of(value, [getError(message, {path: path})]);
   }
-  return Validation.ok(value);
+  return Validation.of(value);
 }
 
 function validateStruct(value, type, path, messages) {
@@ -92,7 +86,7 @@ function validateStruct(value, type, path, messages) {
 
   if (!isValid) {
     var message = getMessage(messages, ':struct', format(':path is `%j`, should be an `Obj`', value));
-    return Validation.ko(value, [getError(message, {path: path})]);
+    return Validation.of(value, [getError(message, {path: path})]);
   }
 
   var errors = [];
@@ -100,7 +94,7 @@ function validateStruct(value, type, path, messages) {
   for (var k in props) {
     if (props.hasOwnProperty(k)) {
       var validation = validate(value[k], props[k], path + '[' + JSON.stringify(k) + ']', getMessage(messages, k));
-      if (!validation.isValid) {
+      if (!validation.isValid()) {
         isValid = false;
         errors = errors.concat(validation.errors);
       }
@@ -108,10 +102,10 @@ function validateStruct(value, type, path, messages) {
   }
 
   if (!isValid) {
-    return Validation.ko(value, errors);
+    return Validation.of(value, errors);
   }
 
-  return Validation.ok(value);
+  return Validation.of(value);
 }
 
 function validateMaybe(value, type, path, messages) {
@@ -121,7 +115,7 @@ function validateMaybe(value, type, path, messages) {
     return validate(value, type.meta.type, path, messages);
   }
 
-  return Validation.ok(value);
+  return Validation.of(value);
 }
 
 function validateSubtype(value, type, path, messages) {
@@ -130,17 +124,17 @@ function validateSubtype(value, type, path, messages) {
   path = path || 'root';
 
   var validation = validate(value, type.meta.type, path, getMessage(messages, ':type'));
-  if (!validation.isValid) {
+  if (!validation.isValid()) {
     return validation;
   }
 
   var predicate = type.meta.predicate;
   if (!predicate(value)) {
     var message = getMessage(messages, ':predicate', format(':path is `%j`, should be truthy for the predicate`', value));
-    return Validation.ko(value, [getError(message, {path: path})]);
+    return Validation.of(value, [getError(message, {path: path})]);
   }
 
-  return Validation.ok(value);
+  return Validation.of(value);
 }
 
 function validateList(value, type, path, messages) {
@@ -152,23 +146,23 @@ function validateList(value, type, path, messages) {
 
   if (!isValid) {
     var message = getMessage(messages, ':list', format(':path is `%j`, should be an `Arr`', value));
-    return Validation.ko(value, [getError(message, {path: path})]);
+    return Validation.of(value, [getError(message, {path: path})]);
   }
 
   var errors = [];
   for (var i = 0, len = value.length ; i < len ; i++ ) {
     var validation = validate(value[i], type.meta.type, path + '[' + i + ']', getMessage(messages, ':type'));
-    if (!validation.isValid) {
+    if (!validation.isValid()) {
       isValid = false;
       errors = errors.concat(validation.errors);
     }
   }
 
   if (!isValid) {
-    return Validation.ko(value, errors);
+    return Validation.of(value, errors);
   }
 
-  return Validation.ok(value);
+  return Validation.of(value);
 }
 
 function validateUnion(value, type, path, messages) {
@@ -181,15 +175,15 @@ function validateUnion(value, type, path, messages) {
 
   if (!Func.is(ctor)) {
     var message = getMessage(messages, ':dispatch', format(':path is `%j`, should be a `%s`', value, getName(type)));
-    return Validation.ko(value, [getError(message, {path: path})]);
+    return Validation.of(value, [getError(message, {path: path})]);
   }
 
   var validation = validate(value, ctor, path, messages);
-  if (!validation.isValid) {
+  if (!validation.isValid()) {
     return validation;
   }
 
-  return Validation.ok(value);
+  return Validation.of(value);
 }
 
 function validateTuple(value, type, path, messages) {
@@ -203,27 +197,28 @@ function validateTuple(value, type, path, messages) {
 
   if (!isValid) {
     var message = getMessage(messages, ':tuple', format(':path is `%j`, should be an `Arr` of length `%s`', value, len));
-    return Validation.ko(value, [getError(message, {path: path})]);
+    return Validation.of(value, [getError(message, {path: path})]);
   }
 
   var errors = [];
   for (var i = 0 ; i < len ; i++ ) {
     var validation = validate(value[i], types[i], path + '[' + i + ']', getMessage(messages, i));
-    if (!validation.isValid) {
+    if (!validation.isValid()) {
       isValid = false;
       errors = errors.concat(validation.errors);
     }
   }
 
   if (!isValid) {
-    return Validation.ko(value, errors);
+    return Validation.of(value, errors);
   }
 
-  return Validation.ok(value);
+  return Validation.of(value);
 }
 
 function validate(value, type, path, messages) {
   assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `validate`, expected a type', type);
+  assert(maybe(Str).is(path), 'Invalid argument `path` of value `%j` supplied to `validate`, expected a `Str`', path);
 
   var kind = type.meta.kind;
   switch (kind) {
@@ -231,25 +226,18 @@ function validate(value, type, path, messages) {
     case 'primitive' :
     case 'enums' :
       return validatePrimitive(value, type, path, messages);
-      break;
     case 'struct' :
       return validateStruct(value, type, path, messages);
-      break;
     case 'maybe' :
       return validateMaybe(value, type, path, messages);
-      break;
     case 'list' :
       return validateList(value, type, path, messages);
-      break;
     case 'subtype' :
       return validateSubtype(value, type, path, messages);
-      break;
     case 'union' :
       return validateUnion(value, type, path, messages);
-      break;
     case 'tuple' :
       return validateTuple(value, type, path, messages);
-      break;
     default :
       fail('Invalid kind `%s` supplied to `validate`, expected an handled kind', kind);
   }

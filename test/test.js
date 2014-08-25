@@ -110,60 +110,60 @@ describe('validate', function () {
 
   describe('primitives', function () {
     it('should validate', function () {
-      eqv(validate('a', Str), {isValid: true, value: 'a', errors: null});
-      eqv(validate(1, Str), {isValid: false, value: 1, errors: [new Error('root is `1`, should be a `Str`')]});
+      eqv(validate('a', Str), {value: 'a', errors: null});
+      eqv(validate(1, Str), {value: 1, errors: [new Error('root is `1`, should be a `Str`')]});
     });
     it('should handle `path` argument', function () {
-      eqv(validate(1, Str, 'path'), {isValid: false, value: 1, errors: [new Error('path is `1`, should be a `Str`')]});
+      eqv(validate(1, Str, 'path'), {value: 1, errors: [new Error('path is `1`, should be a `Str`')]});
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, Str, null, 'mymessage'), {isValid: false, value: 1, errors: [new Error('mymessage')]});
-      eqv(validate(1, Str, 'path', ':path mymessage'), {isValid: false, value: 1, errors: [new Error('path mymessage')]});
+      eqv(validate(1, Str, null, 'mymessage'), {value: 1, errors: [new Error('mymessage')]});
+      eqv(validate(1, Str, 'path', ':path mymessage'), {value: 1, errors: [new Error('path mymessage')]});
     });
   });
 
   describe('enums', function () {
     it('should validate', function () {
-      eqv(validate('audio', Category), {isValid: true, value: 'audio', errors: null});
-      eqv(validate(1, Category), {isValid: false, value: 1, errors: [new Error('root is `1`, should be a `Category`')]});
+      eqv(validate('audio', Category), {value: 'audio', errors: null});
+      eqv(validate(1, Category), {value: 1, errors: [new Error('root is `1`, should be a `Category`')]});
     });
     it('should handle `path` argument', function () {
-      eqv(validate(1, Category, 'path'), {isValid: false, value: 1, errors: [new Error('path is `1`, should be a `Category`')]});
+      eqv(validate(1, Category, 'path'), {value: 1, errors: [new Error('path is `1`, should be a `Category`')]});
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, Category, null, 'mymessage'), {isValid: false, value: 1, errors: [new Error('mymessage')]});
-      eqv(validate(1, Category, 'path', ':path mymessage'), {isValid: false, value: 1, errors: [new Error('path mymessage')]});
+      eqv(validate(1, Category, null, 'mymessage'), {value: 1, errors: [new Error('mymessage')]});
+      eqv(validate(1, Category, 'path', ':path mymessage'), {value: 1, errors: [new Error('path mymessage')]});
     });
   });
 
   describe('list', function () {
     it('should validate', function () {
-      eqv(validate(['a'], Shippings), {isValid: true, value: ['a'], errors: null});
-      eqv(validate(1, Shippings), {isValid: false, value: 1, errors: [new Error('root is `1`, should be an `Arr`')]});
-      eqv(validate([1], Shippings), {isValid: false, value: [1], errors: [new Error('root[0] is `1`, should be a `Str`')]});
+      eqv(validate(['a'], Shippings), {value: ['a'], errors: null});
+      eqv(validate(1, Shippings), {value: 1, errors: [new Error('root is `1`, should be an `Arr`')]});
+      eqv(validate([1], Shippings), {value: [1], errors: [new Error('root[0] is `1`, should be a `Str`')]});
     });
     it('should handle `path` argument', function () {
-      eqv(validate(1, Shippings, 'path'), {isValid: false, value: 1, errors: [new Error('path is `1`, should be an `Arr`')]});
-      eqv(validate([1], Shippings, 'path'), {isValid: false, value: [1], errors: [new Error('path[0] is `1`, should be a `Str`')]});
+      eqv(validate(1, Shippings, 'path'), {value: 1, errors: [new Error('path is `1`, should be an `Arr`')]});
+      eqv(validate([1], Shippings, 'path'), {value: [1], errors: [new Error('path[0] is `1`, should be a `Str`')]});
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, Shippings, null, 'mymessage'), {isValid: false, value: 1, errors: [new Error('mymessage')]});
-      eqv(validate([1], Shippings, 'path', ':path mymessage'), {isValid: false, value: [1], errors: [new Error('path[0] mymessage')]});
+      eqv(validate(1, Shippings, null, 'mymessage'), {value: 1, errors: [new Error('mymessage')]});
+      eqv(validate([1], Shippings, 'path', ':path mymessage'), {value: [1], errors: [new Error('path[0] mymessage')]});
     });
   });
 
   describe('maybe', function () {
     it('should validate', function () {
-      eqv(validate(null, Description), {isValid: true, value: null, errors: null});
-      eqv(validate('a', Description), {isValid: true, value: 'a', errors: null});
-      eqv(validate(1, Description), {isValid: false, value: 1, errors: [new Error('root is `1`, should be a `Str`')]});
+      eqv(validate(null, Description), {value: null, errors: null});
+      eqv(validate('a', Description), {value: 'a', errors: null});
+      eqv(validate(1, Description), {value: 1, errors: [new Error('root is `1`, should be a `Str`')]});
     });
     it('should handle `path` argument', function () {
-      eqv(validate(1, Description, 'path'), {isValid: false, value: 1, errors: [new Error('path is `1`, should be a `Str`')]});
+      eqv(validate(1, Description, 'path'), {value: 1, errors: [new Error('path is `1`, should be a `Str`')]});
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, Description, null, 'mymessage'), {isValid: false, value: 1, errors: [new Error('mymessage')]});
-      eqv(validate(1, Description, 'path', ':path mymessage'), {isValid: false, value: 1, errors: [new Error('path mymessage')]});
+      eqv(validate(1, Description, null, 'mymessage'), {value: 1, errors: [new Error('mymessage')]});
+      eqv(validate(1, Description, 'path', ':path mymessage'), {value: 1, errors: [new Error('path mymessage')]});
     });
   });
 
@@ -175,67 +175,67 @@ describe('validate', function () {
     });
 
     it('should validate', function () {
-      eqv(validate({x: 0, y: 0}, Point), {isValid: true, value: {x: 0, y: 0}, errors: null});
-      eqv(validate(null, Point), {isValid: false, value: null, errors: [new Error('root is `null`, should be an `Obj`')]});
-      eqv(validate({x: 0}, Point), {isValid: false, value: {x: 0}, errors: [new Error('root["y"] is `undefined`, should be a `Num`')]});
+      eqv(validate({x: 0, y: 0}, Point), {value: {x: 0, y: 0}, errors: null});
+      eqv(validate(null, Point), {value: null, errors: [new Error('root is `null`, should be an `Obj`')]});
+      eqv(validate({x: 0}, Point), {value: {x: 0}, errors: [new Error('root["y"] is `undefined`, should be a `Num`')]});
     });
     it('should handle `path` argument', function () {
-      eqv(validate(1, Point, 'path'), {isValid: false, value: 1, errors: [new Error('path is `1`, should be an `Obj`')]});
+      eqv(validate(1, Point, 'path'), {value: 1, errors: [new Error('path is `1`, should be an `Obj`')]});
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, Point, null, 'mymessage'), {isValid: false, value: 1, errors: [new Error('mymessage')]});
-      eqv(validate(1, Point, 'path', ':path mymessage'), {isValid: false, value: 1, errors: [new Error('path mymessage')]});
-      eqv(validate({x: 0}, Point, 'path', ':path mymessage'), {isValid: false, value: {x: 0}, errors: [new Error('path["y"] mymessage')]});
+      eqv(validate(1, Point, null, 'mymessage'), {value: 1, errors: [new Error('mymessage')]});
+      eqv(validate(1, Point, 'path', ':path mymessage'), {value: 1, errors: [new Error('path mymessage')]});
+      eqv(validate({x: 0}, Point, 'path', ':path mymessage'), {value: {x: 0}, errors: [new Error('path["y"] mymessage')]});
     });
   });
 
   describe('subtype', function () {
     it('should validate', function () {
-      eqv(validate('http://gcanti.github.io', URL), {isValid: true, value: 'http://gcanti.github.io', errors: null});
-      eqv(validate(1, URL), {isValid: false, value: 1, errors: [new Error('root is `1`, should be a `Str`')]});
+      eqv(validate('http://gcanti.github.io', URL), {value: 'http://gcanti.github.io', errors: null});
+      eqv(validate(1, URL), {value: 1, errors: [new Error('root is `1`, should be a `Str`')]});
     });
     it('should handle `path` argument', function () {
-      eqv(validate(1, URL, 'path'), {isValid: false, value: 1, errors: [new Error('path is `1`, should be a `Str`')]});
+      eqv(validate(1, URL, 'path'), {value: 1, errors: [new Error('path is `1`, should be a `Str`')]});
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, URL, null, 'mymessage'), {isValid: false, value: 1, errors: [new Error('mymessage')]});
-      eqv(validate(1, URL, 'path', ':path mymessage'), {isValid: false, value: 1, errors: [new Error('path mymessage')]});
+      eqv(validate(1, URL, null, 'mymessage'), {value: 1, errors: [new Error('mymessage')]});
+      eqv(validate(1, URL, 'path', ':path mymessage'), {value: 1, errors: [new Error('path mymessage')]});
     });
   });
 
   describe('tuple', function () {
     it('should validate', function () {
-      eqv(validate([1, 2], Dimension), {isValid: true, value: [1, 2], errors: null});
-      eqv(validate(1, Dimension), {isValid: false, value: 1, errors: [new Error('root is `1`, should be an `Arr` of length `2`')]});
-      eqv(validate([1], Dimension), {isValid: false, value: [1], errors: [new Error('root is `[1]`, should be an `Arr` of length `2`')]});
-      eqv(validate([1, 2, 3], Dimension), {isValid: false, value: [1, 2, 3], errors: [new Error('root is `[1,2,3]`, should be an `Arr` of length `2`')]});
-      eqv(validate([1, 'a'], Dimension), {isValid: false, value: [1, 'a'], errors: [new Error('root[1] is `"a"`, should be a `Num`')]});
+      eqv(validate([1, 2], Dimension), {value: [1, 2], errors: null});
+      eqv(validate(1, Dimension), {value: 1, errors: [new Error('root is `1`, should be an `Arr` of length `2`')]});
+      eqv(validate([1], Dimension), {value: [1], errors: [new Error('root is `[1]`, should be an `Arr` of length `2`')]});
+      eqv(validate([1, 2, 3], Dimension), {value: [1, 2, 3], errors: [new Error('root is `[1,2,3]`, should be an `Arr` of length `2`')]});
+      eqv(validate([1, 'a'], Dimension), {value: [1, 'a'], errors: [new Error('root[1] is `"a"`, should be a `Num`')]});
     });
     it('should handle `path` argument', function () {
-      eqv(validate(1, Dimension, 'path'), {isValid: false, value: 1, errors: [new Error('path is `1`, should be an `Arr` of length `2`')]});
+      eqv(validate(1, Dimension, 'path'), {value: 1, errors: [new Error('path is `1`, should be an `Arr` of length `2`')]});
     });
     it('should handle `message` argument', function () {
-      eqv(validate(1, Dimension, null, 'mymessage'), {isValid: false, value: 1, errors: [new Error('mymessage')]});
-      eqv(validate(1, Dimension, 'path', ':path mymessage'), {isValid: false, value: 1, errors: [new Error('path mymessage')]});
+      eqv(validate(1, Dimension, null, 'mymessage'), {value: 1, errors: [new Error('mymessage')]});
+      eqv(validate(1, Dimension, 'path', ':path mymessage'), {value: 1, errors: [new Error('path mymessage')]});
     });
   });
 
   describe('union', function () {
     it('should validate', function () {
-      eqv(validate(1, Price), {isValid: true, value: 1, errors: null});
-      eqv(validate({currency: 'EUR', amount: 100}, Price), {isValid: true, value: {currency: 'EUR', amount: 100}, errors: null});
-      eqv(validate('a', Price), {isValid: false, value: 'a', errors: [new Error('root is `"a"`, should be a `Price`')]});
-      eqv(validate({}, Price), {isValid: false, value: {}, errors: [
+      eqv(validate(1, Price), {value: 1, errors: null});
+      eqv(validate({currency: 'EUR', amount: 100}, Price), {value: {currency: 'EUR', amount: 100}, errors: null});
+      eqv(validate('a', Price), {value: 'a', errors: [new Error('root is `"a"`, should be a `Price`')]});
+      eqv(validate({}, Price), {value: {}, errors: [
         new Error('root["currency"] is `undefined`, should be a `Str`'),
         new Error('root["amount"] is `undefined`, should be a `Num`'),
       ]});
     });
     it('should handle `path` argument', function () {
-      eqv(validate('a', Price, 'path'), {isValid: false, value: 'a', errors: [new Error('path is `"a"`, should be a `Price`')]});
+      eqv(validate('a', Price, 'path'), {value: 'a', errors: [new Error('path is `"a"`, should be a `Price`')]});
     });
     it('should handle `message` argument', function () {
-      eqv(validate('a', Price, null, 'mymessage'), {isValid: false, value: 'a', errors: [new Error('mymessage')]});
-      eqv(validate('a', Price, 'path', ':path mymessage'), {isValid: false, value: 'a', errors: [new Error('path mymessage')]});
+      eqv(validate('a', Price, null, 'mymessage'), {value: 'a', errors: [new Error('mymessage')]});
+      eqv(validate('a', Price, 'path', ':path mymessage'), {value: 'a', errors: [new Error('path mymessage')]});
     });
   });
 
