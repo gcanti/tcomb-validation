@@ -2,7 +2,7 @@
 
 General purpose validation library for JavaScript.
 
-You can validate all the types provided by [tcomb](https://github.com/gcanti/tcomb): native types, structs, unions, enums, maybe, tuples, subtypes, lists. The syntax is concise yet expressive, output messages are fully customizable and you can validate structures with arbitrary level of nesting.
+You can validate all the types provided by [tcomb](https://github.com/gcanti/tcomb): native types, structs, unions, enums, maybe, tuples, subtypes, lists. The syntax is the same of tcomb: concise yet expressive, output messages are fully customizable and you can validate structures with arbitrary level of nesting, making it ideal for validating input both on the client (UI) and on the server (JSON api).
 
 # Basic usage
 
@@ -197,7 +197,7 @@ React.renderComponentToString(MyComponent(props));
 where `toPropTypes` is a general helper function accepting a struct:
 
 ```javascript
-// helper function: transform a tcomb struct
+// helper function: transforms a tcomb struct
 // in React.js propTypes
 function toPropTypes(Struct) {
   var propTypes = {};
@@ -239,11 +239,86 @@ Returns the first error or `null` if validation succeded.
 
 ### opts.messages
 
-Customize the error messages. TODO reference documentation
+You can fully customize the error messages. Let's define a complex model for a `Product`:
 
-### opts.path
+```javascript
+var Description = maybe(Str);
 
-Customize the error paths. TODO reference documentation
+var URL = t.subtype(Str, function (s) { return s.indexOf('http://') === 0; }, 'URL');
+
+var Shippings = list(Str, 'Shippings');
+
+var Category = enums.of('audio video', 'Category');
+
+var Positive = subtype(t.Num, function (n) { return n >= 0; }, 'Positive');
+
+var ForeignPrice = struct({ 
+  currency: Str, 
+  amount:   Positive 
+}, 'ForeignPrice');
+
+var Price = union([Positive, ForeignPrice], 'Price');
+
+Price.dispatch = function (value) {
+  if (Num.is(value)) {
+    return Positive;
+  } else if (Obj.is(value)) {
+    return ForeignPrice;
+  }
+};
+
+var Dimension = tuple([Num, Num]);
+
+var Product = struct({
+  name:       Str,                  
+  desc:       Description,
+  home:       URL,
+  shippings:  Shippings,       
+  category:   Category,         
+  price:      Price,
+  dim:        Dimension
+}, 'Product');
+```
+Now you can specify a custom message for all `path` of the model:
+
+```javascript
+var messages = {
+  ':input':  'product should be an object',
+  name:       'name should be a string',                  
+  desc:       'desc should be an optional string',
+  home:       {
+    ':type': 'home should be a string', 
+    ':predicate': 'home should be an URL'
+  },
+  shippings:  {
+    ':input': 'shippings should be a list of strings', 
+    ':type': 'every element of shippings should be a string'
+  },       
+  category:   'category should be a valid enum',         
+  price:      {
+    ':dispatch': 'price should be expressed in dollars or in another currency', 
+    0: 'price should be a positive number', 
+    1: {
+      ':struct': 'price should be an object', 
+      currency: 'currency should be a currency', 
+      amount: 'amount should be a positive number'
+    }
+  },
+  dim:        {
+    ':input': 'dim should be an array of length 2', 
+    0: 'dim.width should be a number', 
+    1: 'dim.height should be a number'
+  }
+};
+```
+
+and then call `validate` with your custom messages:
+
+```javascript
+validate(data, Product, {messages: messages});
+```
+
+the library will use your messages instead of the default ones.
 
 # Tests
 
