@@ -1,3 +1,8 @@
+---
+layout: post
+title: tcomb-validation
+---
+
 % tcomb-validation
 
 General purpose validation library for JavaScript.
@@ -27,12 +32,13 @@ validation on both the client and the server.
   - [JSON schema](#json-schema)
   - [An alternative syntax for React propTypes](#an-alternative-syntax-for-react-proptypes)
   - [Backbone validation](#backbone-validation)
+- [Api](api)
 
 *If you don't know how to define types with tcomb you may want to take a look at its [README.md](https://github.com/gcanti/tcomb) file.*
 
 # Basic usage
 
-```javascript
+```js
 validate(value, spec) -> Validation
 ```
 
@@ -41,23 +47,28 @@ validate(value, spec) -> Validation
 
 Returns a `Validation` object containing the result of the validation
 
-```javascript
-validate(1, Str).isValid();   // => false
-validate('a', Str).isValid(); // => true
+```js
+var library = require('tcomb-validation');
+var t = library.t; // re-exported tcomb library
+var validate = library.validate;
+
+validate(1, t.Str).isValid();   // => false
+validate('a', t.Str).isValid(); // => true
 ```
 
-You can inspect the result to identify what's wrong:
+You can inspect the result to quickly identify what's wrong:
 
-```javascript
-var result = validate(1, Str);
+```js
+var result = validate(1, t.Str);
 result.isValid();     // => false
 result.firstError();  // => new Error('value is `1`, should be a `Str`')
-// or result.errors to see all errors
+
+// result.errors to see all errors
 ```
 
 ## Validating primitives
 
-```javascript
+```js
 // null and undefined
 validate('a', Nil).isValid();       // => false
 validate(null, Nil).isValid();      // => true
@@ -74,15 +85,23 @@ validate(1, Num).isValid();   // => true
 // booleans
 validate(1, Bool).isValid();    // => false
 validate(true, Bool).isValid(); // => true
+
+// optional values
+validate(null, maybe(Str)).isValid(); // => true
+validate('a', maybe(Str)).isValid();  // => true
+validate(1, maybe(Str)).isValid();    // => false
+
+// you can also validate functions, dates and regexps
 ```
 
 ## Subtypes
 
 You can express more fine-grained contraints with the `subtype` syntax:
 
-```javascript
+```js
 // a predicate is a function with signature (x) -> Bool
 var predicate = function (x) { return x >= 0; };
+
 // a positive number
 var Positive = subtype(Num, predicate);
 
@@ -92,8 +111,7 @@ validate(1, Positive).isValid();  // => true
 
 ## Validating objects
 
-```javascript
-// schema definition:
+```js
 // this is an object with two numerical properties
 var Point = struct({
   x: Num, 
@@ -109,8 +127,9 @@ validate({x: 0, y: 0}, Point).isValid();    // => true
 
 ## Validating arrays
 
-```javascript
-// schema definition:
+**Lists**
+
+```js
 // this is a list of strings
 var Words = list(Str);
 
@@ -119,11 +138,22 @@ validate(['hello', 1], Words).isValid();          // => false, [1] is not a stri
 validate(['hello', 'world'], Words).isValid();    // => true
 ```
 
+**Tuples**
+
+```js
+// this is a tuple (width x height)
+var Dimensions = tuple([Num, Num]);
+
+validate([1], Dimensions).isValid();      // => false
+validate([1, 'a'], Dimensions).isValid(); // => false
+validate([1, 2], Dimensions).isValid();   // => true
+```
+
 ## Validating nested structures
 
 You can validate structures with arbitrary level of nesting:
 
-```javascript
+```js
 var Post = struct({
   title: Str,
   content: Str,
@@ -136,7 +166,7 @@ var mypost = {
   tags: ['validation', 1] // <-- ouch!
 };
 
-validate(mypost, Post).isValid();     // => false tags[1] is not a string
+validate(mypost, Post).isValid();     // => false
 validate(mypost, Post).firstError();  // => new Error('tags[1] is `1`, should be a `Str`')
 ```
 
@@ -144,66 +174,42 @@ validate(mypost, Post).firstError();  // => new Error('tags[1] is `1`, should be
 
 ## Form validation
 
-Let's design the model for a sign up form. 
+Let's design the process for a simple sign in form:
 
-```javascript
-// a username is a string with at least 3 chars
-var Username = subtype(Str, function (s) {
-  return s.length >= 3;
+```js
+var SignInInfo = struct({
+  username: Str,
+  password: Str
 });
 
-// a password is a string with at least 6 chars
-var Password = subtype(Str, function (s) {
-  return s.length >= 6;
-});
-
-// an email is a string that contains '@' :)
-var Email = subtype(Str, function (s) {
-  return s.indexOf('@') !== -1;
-});
-
-// sign up info (Reddit-like)
-var User = struct({
-  username: Username, // required
-  password: Password, // required
-  email: maybe(Email) // optional, can be `null`
-});
-```
-
-Here the code to validate the signup form
-
-```javascript
+// retrieves values from the UI
 var formValues = {
   username: $('#username').val().trim() || null,
-  password: $('#password').val().trim() || null,
-  email: $('#email').val().trim() || null
+  password: $('#password').val().trim() || null
 };
 
-validate(formValues, User);
+// if formValues = {username: null, password: 'password'}
+validate(formValues, SignInInfo).isValid(); // => false
 
-// if formValues = {password: 'password', email: 'a'}
-// the returned value will be
-[
-  new Error('username is `undefined`, should be a `Str`'),
-  new Error('email is `"a"`, should be truthy for the predicate')
-]
+// the returned error will be: new Error('username is `undefined`, should be a `Str`')
 ```
 
-You can customize the output to return your messages or maybe simply the names of the invalid props for further processing (i.e. feedback to the user that something went wrong).
+You can customize the output to return your messages or simply the names of the invalid props for further processing:
 
-```javascript
-var result = validate(formValues, User, {messages: ':xpath'});
+```js
+var result = validate(formValues, SignInInfo, {messages: 'xpath'});
 
-// the returned value is
-[
-  new Error('username'),
-  new Error('email')
-]
+// the returned error will be: new Error('username')
+
+// display invalid fields to the user
+result.errors.forEach(function (err) {
+  $('#' + err.message).addClass('has-error');
+});
 ```
 
 ## JSON schema
 
-If you don't want to use a JSON Schema validator or it's not applicable, you can use this lightweight library in a snap. Here the JSON Schema example of [http://jsonschemalint.com/](http://jsonschemalint.com/)
+If you don't want to use a JSON Schema validator or it's not applicable, you can just use this lightweight library in a snap. This is the JSON Schema example of [http://jsonschemalint.com/](http://jsonschemalint.com/)
 
 ```json
 {
@@ -224,43 +230,48 @@ If you don't want to use a JSON Schema validator or it's not applicable, you can
 }
 ```
 
-and the equivalent `tcomb-validation` definition:
+and the equivalent `tcomb-validation` counterpart:
 
-```javascript
+```js
 var Schema = struct({
   foo: Num,
-  bar: enums.of('a b c', 'MyEnum')
+  bar: enums.of('a b c')
 });
 ```
 
-the validation:
+let's validate the example JSON:
 
-```javascript
-var doc = {
+```js
+var json = {
   "foo": "this is a string, not a number", 
   "bar": "this is a string that isn't allowed"
-}
-validate(doc, Schema);
+};
 
-// the returned value is
+validate(json, Schema).isValid(); // => false
+
+// the returned errors are:
 [
   new Error('foo is `"this is a string, not a number"`, should be a `Num`'),
-  new Error('bar is `"this is a string that isn\'t allowed"`, should be a `MyEnum`')
+  new Error('bar is `"this is a string that isn\'t allowed"`, should be a `enums`')
 ]
 ```
 
 ## An alternative syntax for React propTypes
 
-You can also use this library as an alternative syntax for the React.js `propTypes`, taking advantage of its expressive and powerful syntax:
+You can also use this library as an alternative syntax for the React.js `propTypes`, taking advantage of its expressive syntax:
 
-```javascript
-var MyComponentProps = struct({
+```js
+// define the component props
+var MyProps = struct({
   foo: Num,
-  bar: subtype(Str, function (s) { return s.length <= 3; })
+  bar: subtype(Str, function (s) { return s.length <= 3; }, 'Bar')
 });
 
+// component definition
 var MyComponent = React.createClass({
-  propTypes: toPropTypes(MyComponentProps), // <- here!
+
+  propTypes: library.toPropTypes(MyProps), // <---
+
   render: function () {
     return (
       <div>
@@ -271,34 +282,18 @@ var MyComponent = React.createClass({
   }    
 });
 
-var props = new MyComponentProps({
+// try to use bad props
+var props = {
   "foo": "this is a string, not a number", 
   "bar": "this is a string too long"
-});
+};
+
+// rendering
 React.renderComponentToString(MyComponent(props));
 
-// print to the console:
-// => Warning: foo is `"this is a string, not a number"`, should be a `Num`
-// => Warning: bar is `"this is a string too long"`, should be truthy for the predicate
-```
-
-where `toPropTypes` is a general helper function accepting a struct:
-
-```javascript
-// helper function: transforms a tcomb struct
-// in React.js propTypes
-function toPropTypes(Struct) {
-  var propTypes = {};
-  var props = Struct.meta.props;
-  Object.keys(props).forEach(function (k) {
-    propTypes[k] = function (values, name, component) {
-      var T = props[name];
-      var value = values[name];
-      return validate(value, T, {path: ['product', k]}).firstError();
-    }
-  });
-  return propTypes;
-}
+// prints to console:
+// => Warning: this.props.foo of value `"this is a string, not a number"` supplied to `undefined`, expected a `Num`
+// => Warning: Warning: this.props.bar of value `"this is a string too long"` supplied to `undefined`, expected a `Bar`
 ```
 
 ## Backbone validation
@@ -314,9 +309,7 @@ TODO
 - a list of `Error` if validation fails 
 - or `null` if succeded.
 
-Here the definition of this type:
-
-```javascript
+```js
 var Validation = struct({
   errors: maybe(list(Err))
 });
@@ -326,7 +319,7 @@ var Validation = struct({
 
 Returns true if there are no errors.
 
-```javascript
+```js
 validate('a', Str).isValid(); // => true
 ```  
 
@@ -334,7 +327,7 @@ validate('a', Str).isValid(); // => true
 
 Returns the first error or `null` if validation succeded.
 
-```javascript
+```js
 validate(1, Str).firstError(); // => new Error('value is `1`, should be a `Str`')
 ```  
 
@@ -346,86 +339,7 @@ validate(1, Str).firstError(); // => new Error('value is `1`, should be a `Str`'
 
 ### opts.messages
 
-You can fully customize the error messages. Let's define a complex model for a `Product`:
-
-```javascript
-var Description = maybe(Str);
-
-var URL = t.subtype(Str, function (s) { return s.indexOf('http://') === 0; }, 'URL');
-
-var Shippings = list(Str, 'Shippings');
-
-var Category = enums.of('audio video', 'Category');
-
-var Positive = subtype(t.Num, function (n) { return n >= 0; }, 'Positive');
-
-var ForeignPrice = struct({ 
-  currency: Str, 
-  amount:   Positive 
-}, 'ForeignPrice');
-
-var Price = union([Positive, ForeignPrice], 'Price');
-
-Price.dispatch = function (value) {
-  if (Num.is(value)) {
-    return Positive;
-  } else if (Obj.is(value)) {
-    return ForeignPrice;
-  }
-};
-
-var Dimension = tuple([Num, Num]);
-
-var Product = struct({
-  name:       Str,                  
-  desc:       Description,
-  home:       URL,
-  shippings:  Shippings,       
-  category:   Category,         
-  price:      Price,
-  dim:        Dimension
-}, 'Product');
-```
-Now you can specify a custom message for all `paths` of the model:
-
-```javascript
-var messages = {
-  ':input':  'product should be an object',
-  name:       'name should be a string',                  
-  desc:       'desc should be an optional string',
-  home:       {
-    ':type': 'home should be a string', 
-    ':predicate': 'home should be an URL'
-  },
-  shippings:  {
-    ':input': 'shippings should be a list of strings', 
-    ':type': 'every element of shippings should be a string'
-  },       
-  category:   'category should be a valid enum',         
-  price:      {
-    ':dispatch': 'price should be expressed in dollars or in another currency', 
-    0: 'price should be a positive number', 
-    1: {
-      ':struct': 'price should be an object', 
-      currency: 'currency should be a currency', 
-      amount: 'amount should be a positive number'
-    }
-  },
-  dim:        {
-    ':input': 'dim should be an array of length 2', 
-    0: 'dim.width should be a number', 
-    1: 'dim.height should be a number'
-  }
-};
-```
-
-and then call `validate` with your custom messages:
-
-```javascript
-validate(data, Product, {messages: messages});
-```
-
-the library will use your messages instead of the default ones.
+TODO
 
 # Tests
 

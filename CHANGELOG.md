@@ -1,6 +1,11 @@
 v.0.0.3
 
-- add jsonpath syntax
+- added JSON Path syntax
+
+**BREAKING**
+
+- removed xpath format
+- complete refactoring of the message system to support React propTypes and Backbone validation
 
 v.0.0.2
 
