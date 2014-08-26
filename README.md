@@ -2,7 +2,33 @@
 
 General purpose validation library for JavaScript.
 
-You can validate all the types provided by [tcomb](https://github.com/gcanti/tcomb): native types, structs, unions, enums, maybe, tuples, subtypes, lists. The syntax is the same of tcomb: concise yet expressive, output messages are fully customizable and you can validate structures with arbitrary level of nesting, making it ideal for validating input both on the client (UI) and on the server (JSON api).
+You can validate all the types provided by [tcomb](https://github.com/gcanti/tcomb) making it ideal for input 
+validation on both the client and the server.
+
+**Features**
+
+- the syntax is concise yet expressive
+- validates native types, structs, unions, enums, maybe, tuples, subtypes, lists
+- validates structures with arbitrary level of nesting
+- precise informations on the failed validations
+- output messages are fully customizable
+- reuse your domain model written with tcomb
+
+**Contents**
+
+- [Basic usage](#basic-usage)
+  - [Validating primitives](#validating-primitives)
+  - [Subtypes](#subtypes)
+  - [Validating objects](#validating-objects)
+  - [Validating arrays](#validating-arrays)
+  - [Validating nested structures](#validating-nested-structures)
+- [Advanced usage and use cases](#advanced-usage-and-use-cases)
+  - [Form validation](#form-validation)
+  - [JSON schema](#json-schema)
+  - [An alternative syntax for React propTypes](#an-alternative-syntax-for-react-proptypes)
+  - [Backbone validation](#backbone-validation)
+
+*If you don't know how to define types with tcomb you may want to take a look at its [README.md](https://github.com/gcanti/tcomb) file.*
 
 # Basic usage
 
@@ -13,7 +39,7 @@ validate(value, spec) -> Validation
 - `value` the value to validate
 - `spec` a type defined with the tcomb library
 
-Returns a `Validation` object containing the result
+Returns a `Validation` object containing the result of the validation
 
 ```javascript
 validate(1, Str).isValid();   // => false
@@ -57,6 +83,7 @@ You can express more fine-grained contraints with the `subtype` syntax:
 ```javascript
 // a predicate is a function with signature (x) -> Bool
 var predicate = function (x) { return x >= 0; };
+// a positive number
 var Positive = subtype(Num, predicate);
 
 validate(-1, Positive).isValid(); // => false
@@ -74,8 +101,8 @@ var Point = struct({
 });
 
 validate(null, Point).isValid();            // => false
-validate({x: 0}, Point).isValid();          // => false
-validate({x: 0, y: 'a'}, Point).isValid();  // => false
+validate({x: 0}, Point).isValid();          // => false, y is missing
+validate({x: 0, y: 'a'}, Point).isValid();  // => false, y is not a number
 validate({x: 0, y: 0}, Point).isValid();    // => true
 
 ```
@@ -88,7 +115,7 @@ validate({x: 0, y: 0}, Point).isValid();    // => true
 var Words = list(Str);
 
 validate(null, Words).isValid();                  // => false
-validate(['hello', 1], Words).isValid();          // => false
+validate(['hello', 1], Words).isValid();          // => false, [1] is not a string
 validate(['hello', 'world'], Words).isValid();    // => true
 ```
 
@@ -105,25 +132,19 @@ var Post = struct({
 
 var mypost = {
   title: 'Awesome!',
-  content: 'You can validate all the types provided by tcomb',
+  content: 'You can validate structures with arbitrary level of nesting',
   tags: ['validation', 1] // <-- ouch!
 };
 
-validate(mypost, Post).isValid();     // => false
+validate(mypost, Post).isValid();     // => false tags[1] is not a string
 validate(mypost, Post).firstError();  // => new Error('tags[1] is `1`, should be a `Str`')
-// `tags[1]` is the xpath to the value causing the failure
 ```
 
 # Advanced usage and use cases
 
-This library is conceived to be general purpose, here some use cases:
-
 ## Form validation
 
 Let's design the model for a sign up form. 
-
-*If you don't know how to define types with tcomb you may want to take a look at the [README.md](https://github.com/gcanti/tcomb) of the project.*
-
 
 ```javascript
 // a username is a string with at least 3 chars
@@ -228,7 +249,7 @@ validate(doc, Schema);
 ]
 ```
 
-## React propTypes
+## An alternative syntax for React propTypes
 
 You can also use this library as an alternative syntax for the React.js `propTypes`, taking advantage of its expressive and powerful syntax:
 
@@ -279,6 +300,10 @@ function toPropTypes(Struct) {
   return propTypes;
 }
 ```
+
+## Backbone validation
+
+TODO
 
 # Api
 

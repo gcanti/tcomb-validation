@@ -1,6 +1,6 @@
 v.0.0.3
 
-- replace xpath with jsonpath
+- add jsonpath syntax
 
 v.0.0.2
 
