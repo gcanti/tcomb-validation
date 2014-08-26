@@ -7,6 +7,7 @@ var sinon = require('sinon');
 
 var t = v.t;
 var validate = v.validate;
+var toPropTypes = v.toPropTypes;
 
 var Str = t.Str;
 var Num = t.Num;
@@ -55,14 +56,16 @@ var eqv = function (a, b, message) {
   }
 }; 
 
-function error(message, path) {
+function error(message, path, actual, expected) {
   var err = new Error(message);
   err.path = path;
+  err.actual = actual;
+  err.expected = expected;
   return err;
 }
 
-function validation(message, path) {
-  return new v.Validation({errors: [error(message, path)]});
+function validation(message, path, actual, expected) {
+  return new v.Validation({errors: [error(message, path, actual, expected)]});
 }
 
 //
@@ -106,37 +109,6 @@ var Product = struct({
 }, 'Product');
 
 //
-// utils
-//
-
-describe('formatError', function () {
-
-  var formatError = v.formatError;
-  
-  it('should handle no params', function () {
-    eq(formatError('a'), 'a');
-  });
-  it('should handle the params', function () {
-    eq(formatError(':greetings', {greetings: 'hello'}), 'hello');
-  });
-});
-
-describe('toXPath', function () {
-
-  var toXPath = v.toXPath;
-  
-  it('should format an array to xpath', function () {
-    eq(toXPath(), 'value');
-    eq(toXPath([]), 'value');
-    eq(toXPath(['x']), 'x');
-    eq(toXPath([1]), '[1]');
-    eq(toXPath(['x', 1]), 'x[1]');
-    eq(toXPath([1, 'x']), '[1]/x');
-    eq(toXPath(['x', 'y', 1]), 'x/y[1]');
-  });
-});
-
-//
 // primitives
 //
 
@@ -147,50 +119,34 @@ describe('validate', function () {
   describe('primitives', function () {
     it('should validate', function () {
       eqv(validate('a', Str), v.Ok);
-      eqv(validate(1, Str), validation('value is `1`, should be a `Str`', []));
+      eqv(validate(1, Str), validation('value is `1`, should be a `Str`', [], 1, 'Str'));
     });
-    it('should handle `path` argument', function () {
-      eqv(validate(1, Str, {path: ['model']}), validation('model is `1`, should be a `Str`', ['model']));
-    });
-    it('should handle `message` argument', function () {
-      eqv(validate(1, Str, {messages: 'mymessage'}), validation('mymessage', []));
-      eqv(validate(1, Str, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
+    it('should handle `messages` option', function () {
+      eqv(validate(1, Str, {messages: 'mymessage'}), validation('mymessage', [], 1, 'Str'));
     });
   });
 
   describe('enums', function () {
     it('should validate', function () {
       eqv(validate('audio', Category), v.Ok);
-      eqv(validate(1, Category), validation('value is `1`, should be a `Category`', []));
+      eqv(validate(1, Category), validation('value is `1`, should be a `Category`', [], 1, 'Category'));
     });
-    it('should handle `path` argument', function () {
-      eqv(validate(1, Category, {path: ['model']}), validation('model is `1`, should be a `Category`', ['model']));
-    });
-    it('should handle `message` argument', function () {
-      eqv(validate(1, Category, {messages: 'mymessage'}), validation('mymessage', []));
-      eqv(validate(1, Category, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
+    it('should handle `messages` option', function () {
+      eqv(validate(1, Category, {messages: 'mymessage'}), validation('mymessage', [], 1, 'Category'));
     });
   });
 
   describe('list', function () {
     it('should validate', function () {
       eqv(validate(['a'], Shippings), v.Ok);
-      eqv(validate(1, Shippings), validation('value is `1`, should be an `Arr`', []));
-      eqv(validate([1], Shippings), validation('[0] is `1`, should be a `Str`', [0]));
+      eqv(validate(1, Shippings), validation('value is `1`, should be a `Arr`', [], 1, 'Arr'));
+      eqv(validate([1], Shippings), validation('[0] is `1`, should be a `Str`', [0], 1, 'Str'));
     });
-    it('should handle `path` argument', function () {
-      eqv(validate(1, Shippings, {path: ['model']}), validation('model is `1`, should be an `Arr`', ['model']));
-      eqv(validate([1], Shippings, {path: ['model']}), validation('model[0] is `1`, should be a `Str`', ['model', 0]));
-    });
-    it('should handle `message` argument', function () {
-      eqv(validate(1, Shippings, {messages: 'mymessage'}), validation('mymessage', []));
-      eqv(validate([1], Shippings, {messages: 'mymessage'}), validation('mymessage', [0]));
-      eqv(validate(1, Shippings, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
-      eqv(validate([1], Shippings, {path: ['model'], messages: ':xpath mymessage'}), validation('model[0] mymessage', ['model', 0]));
-      eqv(validate(1, Shippings, {messages: {':input': 'should be a list'}}), validation('should be a list', []));
-      eqv(validate([1], Shippings, {messages: {':input': 'should be a list'}}), validation('[0] is `1`, should be a `Str`', [0]));
-      eqv(validate([1], Shippings, {messages: {':type': 'should be a string'}}), validation('should be a string', [0]));
-      eqv(validate([1], Shippings, {messages: {':type': ':xpath should be a string'}}), validation('[0] should be a string', [0]));
+    it('should handle `messages` option', function () {
+      eqv(validate(1, Shippings, {messages: 'mymessage'}), validation('mymessage', [], 1, 'Arr'));
+      eqv(validate([1], Shippings, {messages: 'mymessage'}), validation('mymessage', [0], 1, 'Str'));
+      eqv(validate(1, Shippings, {messages: {':input': 'should be a list'}}), validation('should be a list', [], 1, 'Arr'));
+      eqv(validate([1], Shippings, {messages: {':type': 'should be a string'}}), validation('should be a string', [0], 1, 'Str'));
     });
   });
 
@@ -198,14 +154,10 @@ describe('validate', function () {
     it('should validate', function () {
       eqv(validate(null, Description), v.Ok);
       eqv(validate('a', Description), v.Ok);
-      eqv(validate(1, Description), validation('value is `1`, should be a `Str`', []));
+      eqv(validate(1, Description), validation('value is `1`, should be a `Str`', [], 1, 'Str'));
     });
-    it('should handle `path` argument', function () {
-      eqv(validate(1, Description, {path: ['model']}), validation('model is `1`, should be a `Str`', ['model']));
-    });
-    it('should handle `message` argument', function () {
-      eqv(validate(1, Description, {messages: 'mymessage'}), validation('mymessage', []));
-      eqv(validate(1, Description, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
+    it('should handle `messages` option', function () {
+      eqv(validate(1, Description, {messages: 'mymessage'}), validation('mymessage', [], 1, 'Str'));
     });
   });
 
@@ -218,77 +170,60 @@ describe('validate', function () {
 
     it('should validate', function () {
       eqv(validate({x: 0, y: 0}, Point), v.Ok);
-      eqv(validate(null, Point), validation('value is `null`, should be an `Obj`', []));
-      eqv(validate({x: 0}, Point), validation('y is `undefined`, should be a `Num`', ['y']));
-      eqv(validate({x: 0, y: 'a'}, Point), validation('y is `"a"`, should be a `Num`', ['y']));
+      eqv(validate(null, Point), validation('value is `null`, should be an `Obj`', [], null, 'Obj'));
+      eqv(validate({x: 0}, Point), validation('["y"] is `undefined`, should be a `Num`', ['y'], undefined, 'Num'));
+      eqv(validate({x: 0, y: 'a'}, Point), validation('["y"] is `"a"`, should be a `Num`', ['y'], 'a', 'Num'));
     });
-    it('should handle `path` argument', function () {
-      eqv(validate(1, Point, {path: ['model']}), validation('model is `1`, should be an `Obj`', ['model']));
-    });
-    it('should handle `message` argument', function () {
-      eqv(validate(1, Point, {messages: 'mymessage'}), validation('mymessage', []));
-      eqv(validate({x: 0}, Point, {messages: 'mymessage'}), validation('mymessage', ['y']));
-      eqv(validate(1, Point, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
-      eqv(validate({x: 0}, Point, {path: ['model'], messages: ':xpath mymessage'}), validation('model/y mymessage', ['model', 'y']));
-      eqv(validate(1, Point, {messages: {':input': 'should be an obj'}}), validation('should be an obj', []));
-      eqv(validate({x: 0, y: 'a'}, Point, {messages: {'y': 'y should be an obj'}}), validation('y should be an obj', ['y']));
+    it('should handle `messages` option', function () {
+      eqv(validate(1, Point, {messages: 'mymessage'}), validation('mymessage', [], 1, 'Obj'));
+      eqv(validate({x: 0}, Point, {messages: 'mymessage'}), validation('mymessage', ['y'], undefined, 'Num'));
+      eqv(validate(1, Point, {messages: {':input': 'should be an obj'}}), validation('should be an obj', [], 1, 'Obj'));
+      eqv(validate({x: 0, y: 'a'}, Point, {messages: {'y': 'y should be an obj'}}), validation('y should be an obj', ['y'], 'a', 'Num'));
     });
   });
 
   describe('subtype', function () {
     it('should validate', function () {
       eqv(validate('http://gcanti.github.io', URL), v.Ok);
-      eqv(validate(1, URL), validation('value is `1`, should be a `Str`', []));
-      eqv(validate('a', URL), validation('value is `"a"`, should be truthy for the predicate', []));
+      eqv(validate(1, URL), validation('value is `1`, should be a `Str`', [], 1, 'Str'));
+      eqv(validate('a', URL), validation('value is `"a"`, should be a `URL`', [], 'a', 'URL'));
     });
-    it('should handle `path` argument', function () {
-      eqv(validate(1, URL, {path: ['model']}), validation('model is `1`, should be a `Str`', ['model']));
-    });
-    it('should handle `message` argument', function () {
-      eqv(validate(1, URL, {messages: 'mymessage'}), validation('mymessage', []));
-      eqv(validate(1, URL, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
-      eqv(validate(1, URL, {messages: {':type': 'should be a string'}}), validation('should be a string', []));
-      eqv(validate('a', URL, {messages: {':predicate': 'should be a URL'}}), validation('should be a URL', []));
+    it('should handle `messages` option', function () {
+      eqv(validate(1, URL, {messages: 'mymessage'}), validation('mymessage', [], 1, 'Str'));
+      eqv(validate(1, URL, {messages: {':type': 'should be a string'}}), validation('should be a string', [], 1, 'Str'));
+      eqv(validate('a', URL, {messages: {':predicate': 'should be a URL'}}), validation('should be a URL', [], 'a', 'URL'));
     });
   });
 
   describe('tuple', function () {
     it('should validate', function () {
       eqv(validate([1, 2], Dimension), v.Ok);
-      eqv(validate(1, Dimension), validation('value is `1`, should be an `Arr` of length `2`', []));
-      eqv(validate([1], Dimension), validation('value is `[1]`, should be an `Arr` of length `2`', []));
-      eqv(validate([1, 2, 3], Dimension), validation('value is `[1,2,3]`, should be an `Arr` of length `2`', []));
-      eqv(validate([1, 'a'], Dimension), validation('[1] is `"a"`, should be a `Num`', [1]));
+      eqv(validate(1, Dimension), validation('value is `1`, should be a `Arr of length 2`', [], 1, 'Arr of length 2'));
+      eqv(validate([1], Dimension), validation('value is `[1]`, should be a `Arr of length 2`', [], [1], 'Arr of length 2'));
+      eqv(validate([1, 2, 3], Dimension), validation('value is `[1,2,3]`, should be a `Arr of length 2`', [], [1, 2, 3], 'Arr of length 2'));
+      eqv(validate([1, 'a'], Dimension), validation('[1] is `"a"`, should be a `Num`', [1], 'a', 'Num'));
     });
-    it('should handle `path` argument', function () {
-      eqv(validate(1, Dimension, {path: ['model']}), validation('model is `1`, should be an `Arr` of length `2`', ['model']));
-    });
-    it('should handle `message` argument', function () {
-      eqv(validate(1, Dimension, {messages: 'mymessage'}), validation('mymessage', []));
-      eqv(validate(1, Dimension, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
-      eqv(validate(1, Dimension, {messages: {':input': 'should be an array'}}), validation('should be an array', []));
-      eqv(validate([1], Dimension, {messages: {':input': 'should be an array'}}), validation('should be an array', []));
-      eqv(validate([1, 'a'], Dimension, {messages: {'1': 'should be a number'}}), validation('should be a number', [1]));
+    it('should handle `messages` option', function () {
+      eqv(validate(1, Dimension, {messages: 'mymessage'}), validation('mymessage', [], 1, 'Arr of length 2'));
+      eqv(validate(1, Dimension, {messages: {':input': 'should be an array'}}), validation('should be an array', [], 1, 'Arr of length 2'));
+      eqv(validate([1], Dimension, {messages: {':input': 'should be an array'}}), validation('should be an array', [], [1], 'Arr of length 2'));
+      eqv(validate([1, 'a'], Dimension, {messages: {'1': 'should be a number'}}), validation('should be a number', [1], 'a', 'Num'));
     });
   });
 
   describe('union', function () {
     it('should validate', function () { 
       eqv(validate(1, Price), v.Ok);
-      eqv(validate({currency: 'EUR', amount: 100}, Price), {errors: null});
-      eqv(validate('a', Price), validation('value is `"a"`, should be a `Price`', []));
+      eqv(validate({currency: 'EUR', amount: 100}, Price), v.Ok);
+      eqv(validate('a', Price), validation('value is `"a"`, should be a `Price`', [], 'a', 'Price'));
       eqv(validate({}, Price), {errors: [
-        error('currency is `undefined`, should be a `Str`', ['currency']),
-        error('amount is `undefined`, should be a `Num`', ['amount'])
+        error('["currency"] is `undefined`, should be a `Str`', ['currency'], undefined, 'Str'),
+        error('["amount"] is `undefined`, should be a `Num`', ['amount'], undefined, 'Num')
       ]});
     });
-    it('should handle `path` argument', function () {
-      eqv(validate('a', Price, {path: ['model']}), validation('model is `"a"`, should be a `Price`', ['model']));
-    });
-    it('should handle `message` argument', function () {
-      eqv(validate('a', Price, {messages: 'mymessage'}), validation('mymessage', []));
-      eqv(validate('a', Price, {path: ['model'], messages: ':xpath mymessage'}), validation('model mymessage', ['model']));
-      eqv(validate('a', Price, {messages: {':dispatch': 'should be a Price'}}), validation('should be a Price', []));
+    it('should handle `messages` option', function () {
+      eqv(validate('a', Price, {messages: 'mymessage'}), validation('mymessage', [], 'a', 'Price'));
+      eqv(validate('a', Price, {messages: {':dispatch': 'should be a Price'}}), validation('should be a Price', [], 'a', 'Price'));
     });
   });
 
@@ -324,33 +259,33 @@ describe('validate', function () {
 
       it('should return custom messages', function () {
         p = getPatch({name: null});
-        eqv(validate(p, Product, {messages: messages}), validation('name should be a string', ['name']));
+        eqv(validate(p, Product, {messages: messages}), validation('name should be a string', ['name'], null, 'Str'));
         p = getPatch({desc: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('desc should be an optional string', ['desc']));
+        eqv(validate(p, Product, {messages: messages}), validation('desc should be an optional string', ['desc'], 1, 'Str'));
         p = getPatch({home: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('home should be a string', ['home']));
+        eqv(validate(p, Product, {messages: messages}), validation('home should be a string', ['home'], 1, 'Str'));
         p = getPatch({home: 'a'});
-        eqv(validate(p, Product, {messages: messages}), validation('home should be an URL', ['home']));
+        eqv(validate(p, Product, {messages: messages}), validation('home should be an URL', ['home'], 'a', 'URL'));
         p = getPatch({shippings: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('shippings should be a list of strings', ['shippings']));
+        eqv(validate(p, Product, {messages: messages}), validation('shippings should be a list of strings', ['shippings'], 1, 'Arr'));
         p = getPatch({shippings: [1]});
-        eqv(validate(p, Product, {messages: messages}), validation('every element of shippings should be a string', ['shippings', 0]));
+        eqv(validate(p, Product, {messages: messages}), validation('every element of shippings should be a string', ['shippings', 0], 1, 'Str'));
         p = getPatch({category: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('category should be a valid enum', ['category']));
+        eqv(validate(p, Product, {messages: messages}), validation('category should be a valid enum', ['category'], 1, 'Category'));
         p = getPatch({price: 'a'});
-        eqv(validate(p, Product, {messages: messages}), validation('price should be expressed in dollars or in another currency', ['price']));
+        eqv(validate(p, Product, {messages: messages}), validation('price should be expressed in dollars or in another currency', ['price'], 'a', 'Price'));
         p = getPatch({price: -1});
-        eqv(validate(p, Product, {messages: messages}), validation('price should be a positive number', ['price']));
+        eqv(validate(p, Product, {messages: messages}), validation('price should be a positive number', ['price'], -1, 'Positive'));
         p = getPatch({dim: -1});
-        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['dim'], -1, 'Arr of length 2'));
         p = getPatch({dim: []});
-        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['dim'], [], 'Arr of length 2'));
         p = getPatch({dim: [1]});
-        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['dim'], [1], 'Arr of length 2'));
         p = getPatch({dim: [1, 2, 3]});
-        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim should be an array of length 2', ['dim'], [1, 2, 3], 'Arr of length 2'));
         p = getPatch({dim: [1, 'a']});
-        eqv(validate(p, Product, {messages: messages}), validation('dim.height should be a number', ['dim', 1]));
+        eqv(validate(p, Product, {messages: messages}), validation('dim.height should be a number', ['dim', 1], 'a', 'Num'));
       });
     });
 
@@ -369,50 +304,37 @@ describe('validate', function () {
 
       it('should return the name of the prop', function () {
         p = getPatch({name: null});
-        eqv(validate(p, Product, {messages: messages}), validation('name', ['name']));
+        eqv(validate(p, Product, {messages: messages}), validation('name', ['name'], null, 'Str'));
         p = getPatch({desc: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('desc', ['desc']));
+        eqv(validate(p, Product, {messages: messages}), validation('desc', ['desc'], 1, 'Str'));
         p = getPatch({home: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('home', ['home']));
+        eqv(validate(p, Product, {messages: messages}), validation('home', ['home'], 1, 'Str'));
         p = getPatch({home: 'a'});
-        eqv(validate(p, Product, {messages: messages}), validation('home', ['home']));
+        eqv(validate(p, Product, {messages: messages}), validation('home', ['home'], 'a', 'URL'));
         p = getPatch({shippings: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('shippings', ['shippings']));
+        eqv(validate(p, Product, {messages: messages}), validation('shippings', ['shippings'], 1, 'Arr'));
         p = getPatch({shippings: [1]});
-        eqv(validate(p, Product, {messages: messages}), validation('shippings', ['shippings', 0]));
+        eqv(validate(p, Product, {messages: messages}), validation('shippings', ['shippings', 0], 1, 'Str'));
         p = getPatch({category: 1});
-        eqv(validate(p, Product, {messages: messages}), validation('category', ['category']));
+        eqv(validate(p, Product, {messages: messages}), validation('category', ['category'], 1, 'Category'));
         p = getPatch({price: 'a'});
-        eqv(validate(p, Product, {messages: messages}), validation('price', ['price']));
+        eqv(validate(p, Product, {messages: messages}), validation('price', ['price'], 'a', 'Price'));
         p = getPatch({price: -1});
-        eqv(validate(p, Product, {messages: messages}), validation('price', ['price']));
+        eqv(validate(p, Product, {messages: messages}), validation('price', ['price'], -1, 'Positive'));
         p = getPatch({dim: -1});
-        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim'], -1, 'Arr of length 2'));
         p = getPatch({dim: []});
-        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim'], [], 'Arr of length 2'));
         p = getPatch({dim: [1]});
-        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim'], [1], 'Arr of length 2'));
         p = getPatch({dim: [1, 2, 3]});
-        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim']));
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim'], [1, 2, 3], 'Arr of length 2'));
         p = getPatch({dim: [1, 'a']});
-        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim', 1]));
+        eqv(validate(p, Product, {messages: messages}), validation('dim', ['dim', 1], 'a', 'Num'));
       });
     });
 
     describe('React propTypes', function () {
-
-      function toPropTypes(Struct) {
-        var propTypes = {};
-        var props = Struct.meta.props;
-        Object.keys(props).sort().forEach(function (k) {
-          propTypes[k] = function (values, name, component) {
-            var T = props[name];
-            var value = values[name];
-            return validate(value, T, {path: ['product', k]}).firstError();
-          }
-        });
-        return propTypes;
-      }
 
       var p = {desc: 1};
 
@@ -440,13 +362,13 @@ describe('validate', function () {
           spy.getCall(6).args[0]
         ].sort();
 
-        eq(calls[0], 'Warning: product/category is `undefined`, should be a `Category`');
-        eq(calls[1], 'Warning: product/desc is `1`, should be a `Str`');
-        eq(calls[2], 'Warning: product/dim is `undefined`, should be an `Arr` of length `2`');
-        eq(calls[3], 'Warning: product/home is `undefined`, should be a `Str`');
-        eq(calls[4], 'Warning: product/name is `undefined`, should be a `Str`');
-        eq(calls[5], 'Warning: product/price is `undefined`, should be a `Price`');
-        eq(calls[6], 'Warning: product/shippings is `undefined`, should be an `Arr`');
+        eq(calls[0], 'Warning: this.props.category of value `undefined` supplied to `ProductComponent`, expected a `Category`');
+        eq(calls[1], 'Warning: this.props.desc of value `1` supplied to `ProductComponent`, expected a `Str`');
+        eq(calls[2], 'Warning: this.props.dim of value `undefined` supplied to `ProductComponent`, expected a `Arr of length 2`');
+        eq(calls[3], 'Warning: this.props.home of value `undefined` supplied to `ProductComponent`, expected a `Str`');
+        eq(calls[4], 'Warning: this.props.name of value `undefined` supplied to `ProductComponent`, expected a `Str`');
+        eq(calls[5], 'Warning: this.props.price of value `undefined` supplied to `ProductComponent`, expected a `Price`');
+        eq(calls[6], 'Warning: this.props.shippings of value `undefined` supplied to `ProductComponent`, expected a `Arr`');
 
         console.warn = warn;
       });
@@ -457,5 +379,28 @@ describe('validate', function () {
 
 });
 
+// define the component props
+var MyProps = struct({
+  foo: Num,
+  bar: subtype(Str, function (s) { return s.length <= 3; }, 'Bar')
+});
 
+// component definition
+var MyComponent = React.createClass({
+  propTypes: toPropTypes(MyProps), // <- here!
+  render: function () {
+    return (
+      React.DOM.div()
+    );
+  }    
+});
+
+// try to use bad props
+var props = {
+  "foo": "this is a string, not a number", 
+  "bar": "this is a string too long"
+};
+
+// rendering
+React.renderComponentToString(MyComponent(props));
 

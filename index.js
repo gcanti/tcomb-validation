@@ -20,6 +20,7 @@ var isType = t.isType;
 var assert = t.assert;
 var getName = t.getName;
 var format = t.format;
+var mixin = t.mixin;
 
 //
 // Validation model
@@ -43,27 +44,22 @@ var Ok = new Validation({errors: null});
 //
 // utils
 //
-function toXPath(path) {
-  var len;
-  if (path && (len = path.length)) {
-    var ret = '';
-    var el;
-    for (var i = 0 ; i < len ; i++ ) {
-      el = path[i];
-      ret += Num.is(el) ? '[' + el + ']' : (i > 0 ? '/' : '') + el;
-    }
-    return ret;
-  }
-  return 'value';
+
+function toJSONPath(path) {
+  return path.map(function (prop) {
+    return '[' + JSON.stringify(prop) + ']';
+  }).join('');
 }
 
-function ko(message, path) {
-  var params = {};
-  if (message.indexOf(':xpath') !== -1) {
-    params.xpath = toXPath(path);
-  }
-  var err = new Error(formatError(message, params));
-  err.path = path;
+function ko(message, params) {
+  var values = {
+    path: params.path.join('.') || 'value',
+    jsonpath: toJSONPath(params.path) || 'value',
+    actual: JSON.stringify(params.actual),
+    expected: params.expected
+  };
+  var err = new Error(formatError(message, values));
+  mixin(err, params);
   return new Validation({errors: [err]});
 }
 
@@ -97,8 +93,8 @@ function validatePrimitive(value, type, opts) {
   assert(maybe(Str).is(opts.messages));
 
   if (!type.is(value)) {
-    var message = opts.messages || format(':xpath is `%j`, should be a `%s`', value, getName(type));
-    return ko(message, opts.path);
+    var message = opts.messages || ':jsonpath is `:actual`, should be a `:expected`';
+    return ko(message, {path: opts.path, actual: value, expected: getName(type)});
   }
 
   return Ok;
@@ -110,8 +106,8 @@ function validateStruct(value, type, opts) {
   var isValid = Obj.is(value);
 
   if (!isValid) {
-    var message = getMessage(opts.messages, ':input', format(':xpath is `%j`, should be an `Obj`', value));
-    return ko(message, opts.path);
+    var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be an `:expected`');
+    return ko(message, {path: opts.path, actual: value, expected: 'Obj'});
   }
 
   var errors = [];
@@ -153,8 +149,8 @@ function validateSubtype(value, type, opts) {
 
   var predicate = type.meta.predicate;
   if (!predicate(value)) {
-    var message = getMessage(opts.messages, ':predicate', format(':xpath is `%j`, should be truthy for the predicate', value));
-    return ko(message, opts.path);
+    var message = getMessage(opts.messages, ':predicate', ':jsonpath is `:actual`, should be a `:expected`');
+    return ko(message, {path: opts.path, actual: value, expected: getName(type)});
   }
 
   return Ok;
@@ -166,8 +162,8 @@ function validateList(value, type, opts) {
   var isValid = Arr.is(value);
 
   if (!isValid) {
-    var message = getMessage(opts.messages, ':input', format(':xpath is `%j`, should be an `Arr`', value));
-    return ko(message, opts.path);
+    var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
+    return ko(message, {path: opts.path, actual: value, expected: 'Arr'});
   }
 
   var errors = [];
@@ -193,8 +189,8 @@ function validateUnion(value, type, opts) {
   var ctor = type.dispatch(value);
 
   if (!Func.is(ctor)) {
-    var message = getMessage(opts.messages, ':dispatch', format(':xpath is `%j`, should be a `%s`', value, getName(type)));
-    return ko(message, opts.path);
+    var message = getMessage(opts.messages, ':dispatch', ':jsonpath is `:actual`, should be a `:expected`');
+    return ko(message, {path: opts.path, actual: value, expected: getName(type)});
   }
 
   var i = type.meta.types.indexOf(ctor);
@@ -214,8 +210,8 @@ function validateTuple(value, type, opts) {
   var isValid = Arr.is(value) && value.length === len;
 
   if (!isValid) {
-    var message = getMessage(opts.messages, ':input', format(':xpath is `%j`, should be an `Arr` of length `%s`', value, len));
-    return ko(message, opts.path);
+    var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
+    return ko(message, {path: opts.path, actual: value, expected: 'Arr of length ' + len});
   }
 
   var errors = [];
@@ -266,17 +262,31 @@ function validate(value, type, opts) {
   }
 }
 
-module.exports = {
+function toPropTypes(Struct) {
+  
+  var propTypes = {};
+  var props = Struct.meta.props;
+  
+  Object.keys(props).forEach(function (k) {
+    // React custom prop validator
+    // see http://facebook.github.io/react/docs/reusable-components.html
+    propTypes[k] = function (values, name, component) {
+      var opts = {
+        path: ['this.props.' + name], 
+        messages: ':path of value `:actual` supplied to `' + component + '`, expected a `:expected`'
+      };
+      return validate(values[name], props[name], opts).firstError();
+    }
+  });
 
+  return propTypes;
+}
+
+module.exports = {
   // export tcomb for convenience
   t: t,
-
-  // utils
-  formatError: formatError,
-  toXPath: toXPath,
-
   Ok: Ok,
   Validation: Validation,
-  validate: validate
-
+  validate: validate,
+  toPropTypes: toPropTypes
 };
