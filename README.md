@@ -1,8 +1,3 @@
----
-layout: post
-title: tcomb-validation
----
-
 % tcomb-validation
 
 General purpose validation library for JavaScript.
