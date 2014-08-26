@@ -6,50 +6,117 @@ You can validate all the types provided by [tcomb](https://github.com/gcanti/tco
 
 # Basic usage
 
-The main exported function is:
-
 ```javascript
-validate(value, spec, [opts]) -> maybe(list(Err))
+validate(value, spec) -> Validation
 ```
 
 - `value` the value to validate
 - `spec` a type defined with the tcomb library
-- `opts` options hash, see Api section for details
 
-Returns: 
-
-- a list of `Error` if validation fails 
-- or `null` if succeded.
-
-Example
+Returns a `Validation` object containing the result
 
 ```javascript
-var t = require('tcomb');
-
-// validating a string
-validate(1, t.Str); // => new Error('value is `1`, should be a `Str`')
-
-// validating an object
-// with two numerical props
-var Point = t.struct({
-  x: t.Num, 
-  y: t.Num
-});
-validate(null, Point); // => new Error('value is `null`, should be an `Obj`')
-validate({x: 0}, Point); // => new Error('y is `undefined`, should be a `Num`')
-validate({x: 0, y: 'a'}, Point); // => new Error('y is `"a"`, should be a `Num`)
-
-// validating an array
-// (width x height)
-var Dimension = tuple([Num, Num]); 
-validate([1, 2, 3], Dimension); // => new Error('value is `[1,2,3]`, should be an `Arr` of length `2`')
-validate([1, 'a'], Dimension); // => new Error('[1] is `"a"`, should be a `Num`')
+validate(1, Str).isValid();   // => false
+validate('a', Str).isValid(); // => true
 ```
 
+You can inspect the result to identify what's wrong:
+
+```javascript
+var result = validate(1, Str);
+result.isValid();     // => false
+result.firstError();  // => new Error('value is `1`, should be a `Str`')
+// or result.errors to see all errors
+```
+
+## Validating primitives
+
+```javascript
+// null and undefined
+validate('a', Nil).isValid();       // => false
+validate(null, Nil).isValid();      // => true
+validate(undefined, Nil).isValid(); // => true
+
+// strings
+validate(1, Str).isValid();   // => false
+validate('a', Str).isValid(); // => true
+
+// numbers
+validate('a', Num).isValid(); // => false
+validate(1, Num).isValid();   // => true
+
+// booleans
+validate(1, Bool).isValid();    // => false
+validate(true, Bool).isValid(); // => true
+```
+
+## Subtypes
+
+You can express more fine-grained contraints with the `subtype` syntax:
+
+```javascript
+// a predicate is a function with signature (x) -> Bool
+var predicate = function (x) { return x >= 0; };
+var Positive = subtype(Num, predicate);
+
+validate(-1, Positive).isValid(); // => false
+validate(1, Positive).isValid();  // => true
+```
+
+## Validating objects
+
+```javascript
+// schema definition:
+// this is an object with two numerical properties
+var Point = struct({
+  x: Num, 
+  y: Num
+});
+
+validate(null, Point).isValid();            // => false
+validate({x: 0}, Point).isValid();          // => false
+validate({x: 0, y: 'a'}, Point).isValid();  // => false
+validate({x: 0, y: 0}, Point).isValid();    // => true
+
+```
+
+## Validating arrays
+
+```javascript
+// schema definition:
+// this is a list of strings
+var Words = list(Str);
+
+validate(null, Words).isValid();                  // => false
+validate(['hello', 1], Words).isValid();          // => false
+validate(['hello', 'world'], Words).isValid();    // => true
+```
+
+## Validating nested structures
+
+You can validate structures with arbitrary level of nesting:
+
+```javascript
+var Post = struct({
+  title: Str,
+  content: Str,
+  tags: Words
+});
+
+var mypost = {
+  title: 'Awesome!',
+  content: 'You can validate all the types provided by tcomb',
+  tags: ['validation', 1] // <-- ouch!
+};
+
+validate(mypost, Post).isValid();     // => false
+validate(mypost, Post).firstError();  // => new Error('tags[1] is `1`, should be a `Str`')
+// `tags[1]` is the xpath to the value causing the failure
+```
 
 # Advanced usage and use cases
 
-This library is conceived to be general purpose, here some use case:
+This library is conceived to be general purpose, here some use cases:
 
 ## Form validation
 
@@ -104,7 +171,7 @@ validate(formValues, User);
 You can customize the output to return your messages or maybe simply the names of the invalid props for further processing (i.e. feedback to the user that something went wrong).
 
 ```javascript
-var result = validate(values, User, {messages: ':xpath'});
+var result = validate(formValues, User, {messages: ':xpath'});
 
 // the returned value is
 [
@@ -217,19 +284,34 @@ function toPropTypes(Struct) {
 
 ## Validation
 
+`Validation` is a struct containing an `errors` prop which is:
+
+- a list of `Error` if validation fails 
+- or `null` if succeded.
+
 Here the definition of this type:
 
 ```javascript
-var Validation = maybe(list(Err));
+var Validation = struct({
+  errors: maybe(list(Err))
+});
 ```
 
 ### #isValid()
 
 Returns true if there are no errors.
 
+```javascript
+validate('a', Str).isValid(); // => true
+```  
+
 ### #firstError()
 
 Returns the first error or `null` if validation succeded.
+
+```javascript
+validate(1, Str).firstError(); // => new Error('value is `1`, should be a `Str`')
+```  
 
 ## validate(value, type, [opts]) -> Validation
 
@@ -279,7 +361,7 @@ var Product = struct({
   dim:        Dimension
 }, 'Product');
 ```
-Now you can specify a custom message for all `path` of the model:
+Now you can specify a custom message for all `paths` of the model:
 
 ```javascript
 var messages = {
