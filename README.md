@@ -1,51 +1,57 @@
 % tcomb-validation
 
-General purpose validation library for JavaScript.
+![tcomb logo](http://gcanti.github.io/resources/tcomb/logo.png)
 
-You can validate all the types provided by [tcomb](https://github.com/gcanti/tcomb) making it ideal for input 
-validation on both the client and the server.
+General purpose validation library for JavaScript.
 
 **Features**
 
-- the syntax is concise yet expressive
-- validates native types, structs, unions, enums, maybe, tuples, subtypes, lists
+- concise yet expressive syntax
+- validates native types, subtypes, objects, lists and tuples, enums, unions
 - validates structures with arbitrary level of nesting
-- precise informations on the failed validations
+- detailed informations on failed validations
 - output messages are fully customizable
-- reuse your domain model written with tcomb
+- reuse your domain model written with [tcomb](https://github.com/gcanti/tcomb)
 
 **Contents**
 
 - [Basic usage](#basic-usage)
-  - [Validating primitives](#validating-primitives)
+  - [Primitives](#primitives)
   - [Subtypes](#subtypes)
-  - [Validating objects](#validating-objects)
-  - [Validating arrays](#validating-arrays)
-  - [Validating nested structures](#validating-nested-structures)
+  - [Objects](#objects)
+  - [Lists and tuples](#lists-and-tuples)
+  - [Enums](#enums)
+  - [Unions](#unions)
+  - [Nested structures](#nested-structures)
 - [Advanced usage and use cases](#advanced-usage-and-use-cases)
   - [Form validation](#form-validation)
   - [JSON schema](#json-schema)
   - [An alternative syntax for React propTypes](#an-alternative-syntax-for-react-proptypes)
+  - [Full debugging support for React components](full-debugging-support-for-react-components)
   - [Backbone validation](#backbone-validation)
-- [Api](api)
-
-*If you don't know how to define types with tcomb you may want to take a look at its [README.md](https://github.com/gcanti/tcomb) file.*
+  - [Full debugging support for Backbone models](full-debugging-support-for-backbone-models)
+- [Api reference](api-reference)
 
 # Basic usage
+
+If you don't know how to define types with tcomb you may want to take a look at its [README](https://github.com/gcanti/tcomb/blob/master/README.md) file.
+
+The validate function:
 
 ```js
 validate(value, spec) -> Validation
 ```
 
 - `value` the value to validate
-- `spec` a type defined with the tcomb library
+- `spec` a type defined with the [tcomb](https://github.com/gcanti/tcomb) library
 
 Returns a `Validation` object containing the result of the validation
 
+Example
+
 ```js
-var library = require('tcomb-validation');
-var t = library.t; // re-exported tcomb library
-var validate = library.validate;
+var t = require('tcomb-validation');
+var validate = t.addons.validation.validate;
 
 validate(1, t.Str).isValid();   // => false
 validate('a', t.Str).isValid(); // => true
@@ -58,10 +64,10 @@ var result = validate(1, t.Str);
 result.isValid();     // => false
 result.firstError();  // => new Error('value is `1`, should be a `Str`')
 
-// result.errors to see all errors
+// see `result.errors` to inspect all errors
 ```
 
-## Validating primitives
+## Primitives
 
 ```js
 // null and undefined
@@ -86,7 +92,17 @@ validate(null, maybe(Str)).isValid(); // => true
 validate('a', maybe(Str)).isValid();  // => true
 validate(1, maybe(Str)).isValid();    // => false
 
-// you can also validate functions, dates and regexps
+// functions
+validate(1, Func).isValid();              // => false
+validate(function () {}, Func).isValid(); // => true
+
+// dates
+validate(1, Dat).isValid();           // => false
+validate(new Date(), Dat).isValid();  // => true
+
+// regexps
+validate(1, Re).isValid();    // => false
+validate(/^a/, Re).isValid(); // => true
 ```
 
 ## Subtypes
@@ -94,7 +110,7 @@ validate(1, maybe(Str)).isValid();    // => false
 You can express more fine-grained contraints with the `subtype` syntax:
 
 ```js
-// a predicate is a function with signature (x) -> Bool
+// a predicate is a function with signature: (x) -> boolean
 var predicate = function (x) { return x >= 0; };
 
 // a positive number
@@ -104,10 +120,10 @@ validate(-1, Positive).isValid(); // => false
 validate(1, Positive).isValid();  // => true
 ```
 
-## Validating objects
+## Objects
 
 ```js
-// this is an object with two numerical properties
+// an object with two numerical properties
 var Point = struct({
   x: Num, 
   y: Num
@@ -120,12 +136,12 @@ validate({x: 0, y: 0}, Point).isValid();    // => true
 
 ```
 
-## Validating arrays
+## Lists and tuples
 
 **Lists**
 
 ```js
-// this is a list of strings
+// a list of strings
 var Words = list(Str);
 
 validate(null, Words).isValid();                  // => false
@@ -136,15 +152,34 @@ validate(['hello', 'world'], Words).isValid();    // => true
 **Tuples**
 
 ```js
-// this is a tuple (width x height)
-var Dimensions = tuple([Num, Num]);
+// a tuple (width x height)
+var Size = tuple([Positive, Positive]);
 
-validate([1], Dimensions).isValid();      // => false
-validate([1, 'a'], Dimensions).isValid(); // => false
-validate([1, 2], Dimensions).isValid();   // => true
+validate([1], Size).isValid();      // => false, height missing
+validate([1, -1], Size).isValid();  // => false, bad height
+validate([1, 2], Size).isValid();   // => true
 ```
 
-## Validating nested structures
+## Enums
+
+```js
+var CssTextAlign = enums.of('left right center justify');
+
+validate('bottom', CssTextAlign).isValid(); // => false
+validate('left', CssTextAlign).isValid():   // => true
+```
+
+## Unions
+
+```js
+var CssLineHeight = union([Num, Str]);
+
+validate(null, CssLineHeight).isValid();    // => false
+validate(1.4, CssLineHeight).isValid():     // => true
+validate('1.2em', CssLineHeight).isValid(): // => true
+```
+
+## Nested structures
 
 You can validate structures with arbitrary level of nesting:
 
@@ -184,21 +219,20 @@ var formValues = {
 };
 
 // if formValues = {username: null, password: 'password'}
-validate(formValues, SignInInfo).isValid(); // => false
-
-// the returned error will be: new Error('username is `undefined`, should be a `Str`')
+var result = validate(formValues, SignInInfo);
+result.isValid();     // => false
+result.firstError();  // => new Error('username is `undefined`, should be a `Str`')
 ```
 
 You can customize the output to return your messages or simply the names of the invalid props for further processing:
 
 ```js
-var result = validate(formValues, SignInInfo, {messages: 'xpath'});
-
-// the returned error will be: new Error('username')
+var result = validate(formValues, SignInInfo, {messages: ':path'});
+result.firstError(); // => new Error('username')
 
 // display invalid fields to the user
 result.errors.forEach(function (err) {
-  $('#' + err.message).addClass('has-error');
+  $('#' + err.message).parent().addClass('has-error'); // Bootstrap 3
 });
 ```
 
@@ -265,7 +299,7 @@ var MyProps = struct({
 // component definition
 var MyComponent = React.createClass({
 
-  propTypes: library.toPropTypes(MyProps), // <---
+  propTypes: toPropTypes(MyProps), // <--- !
 
   render: function () {
     return (
@@ -291,11 +325,83 @@ React.renderComponentToString(MyComponent(props));
 // => Warning: Warning: this.props.bar of value `"this is a string too long"` supplied to `undefined`, expected a `Bar`
 ```
 
+where `toPropTypes` is a generic function accepting a struct:
+
+```js
+function toPropTypes(Struct) {
+  
+  var propTypes = {};
+  var props = Struct.meta.props;
+  
+  Object.keys(props).forEach(function (k) {
+    // React custom prop validator
+    // see http://facebook.github.io/react/docs/reusable-components.html
+    propTypes[k] = function (values, name, component) {
+      var opts = {
+        path: ['this.props.' + name], 
+        messages: ':path of value `:actual` supplied to `' + component + '`, expected a `:expected`'
+      };
+      return validate(values[name], props[name], opts).firstError();
+    }
+  });
+
+  return propTypes;
+}
+```
+
+## Full debugging support for React components
+
+A complete alternative to `propTypes` is adding this simple snippet to your `render` methods to obtain a full debugging support:
+
+```js
+var MyComponent = React.createClass({
+  render: function () {
+    this.props = MyProps(this.props); // if bad props are passed, the debugger kicks in
+    return (
+      <div>
+        <div>Foo is: {this.props.foo}</div>
+        <div>Bar is: {this.props.bar}</div>
+      </div>
+    );
+  }    
+});
+```
+
 ## Backbone validation
 
-TODO
+```js
+// attributes definition
+var Attrs = struct({
+  x: Num,
+  y: Num
+});
 
-# Api
+var options = {validate: true};
+
+var Model = Backbone.Model.extend({
+  validate: function (attrs, options) {
+    return validate(attrs, Attrs).errors;
+  }
+});
+
+var model = new Model({x: 1, y: 2}, options);
+console.log(model.attributes); // => { x: 1, y: 2 }
+model.set({x: 'a'}, options);  // bad attribute
+console.log(model.attributes); // => { x: 1, y: 2 } attributes are unchanged
+```
+
+## Full debugging support for Backbone models
+
+To obtain a full debugging support simply modify the `validate` method:
+
+```js
+validate: function (attrs, options) {
+  attrs = Attrs(attrs); // if bad attributes are passed, the debugger kicks in
+  return validate(attrs, Attrs).errors;
+}
+```
+
+# Api reference
 
 ## Validation
 
@@ -334,7 +440,53 @@ validate(1, Str).firstError(); // => new Error('value is `1`, should be a `Str`'
 
 ### opts.messages
 
-TODO
+Customizes the error messages:
+
+```js
+var Point = struct({
+  x: Num, 
+  y: Num
+});
+
+var myMessages = {
+  x: 'x should be a number',
+  y: 'y should be a number'
+};
+
+var result = validate({x: 'a'}, Point, {messages: myMessages}); 
+console.log(result.errors);
+
+// outputs
+[
+  new Error('x should be a number'),
+  new Error('y should be a number')
+]
+```
+
+**Placeholders**
+
+In your custom messages, you can use the following placeholders:
+
+- `:path`: the path of the offending value
+- `:jsonpath`: the path of the offending value in [JSON Path](http://goessner.net/articles/JsonPath/) format 
+- `:actual`: the actual offending value
+- `:expected`: the type of the expected value
+
+```js
+myMessages = {
+  x: ':jsonpath = :actual instead of a :expected',
+  y: ':jsonpath = :actual instead of a :expected'
+};
+
+var result = validate({x: 'a'}, Point, {messages: myMessages}); 
+console.log(result.errors);
+
+// outputs
+[
+  new Error('["x"] = "a" instead of a Num'),
+  new Error('["y"] = undefined instead of a Num')
+]
+```
 
 # Tests
 

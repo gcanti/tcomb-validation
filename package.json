@@ -1,10 +1,11 @@
 {
   "name": "tcomb-validation",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "General purpose validation library for JavaScript",
   "main": "index.js",
   "scripts": {
-    "test": "mocha"
+    "test": "mocha",
+    "build": "browserify index.js -o build/tcomb-validation.js --standalone TcombValidation"
   },
   "repository": {
     "type": "git",
@@ -17,11 +18,12 @@
   },
   "homepage": "https://github.com/gcanti/tcomb-validation",
   "dependencies": {
-    "tcomb": "*"
+    "tcomb": "~0.0.12"
   },
   "devDependencies": {
     "mocha": "*",
     "react": "*",
+    "backbone": "*",
     "sinon": "*"
   },
   "tags": [
