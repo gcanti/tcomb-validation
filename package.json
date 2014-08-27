@@ -21,10 +21,10 @@
     "tcomb": "~0.0.12"
   },
   "devDependencies": {
-    "mocha": "*",
-    "react": "*",
-    "backbone": "*",
-    "sinon": "*"
+    "mocha": "^1.21.4",
+    "react": "^0.11.1",
+    "backbone": "^1.1.2",
+    "sinon": "^1.10.3"
   },
   "tags": [
     "validation"
