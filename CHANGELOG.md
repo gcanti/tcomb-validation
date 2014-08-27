@@ -4,8 +4,9 @@ v.0.0.3
 
 **BREAKING**
 
+- `validate` is now exported in `t.addons.validation.validate`
 - removed xpath format
-- complete refactoring of the message system to support React propTypes and Backbone validation
+- complete refactoring of the message system
 
 v.0.0.2
 

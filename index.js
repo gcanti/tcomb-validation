@@ -56,7 +56,7 @@ function ko(message, params) {
     path: params.path.join('.') || 'value',
     jsonpath: toJSONPath(params.path) || 'value',
     actual: JSON.stringify(params.actual),
-    expected: params.expected
+    expected: getName(params.expected)
   };
   var err = new Error(formatError(message, values));
   mixin(err, params);
@@ -94,7 +94,7 @@ function validatePrimitive(value, type, opts) {
 
   if (!type.is(value)) {
     var message = opts.messages || ':jsonpath is `:actual`, should be a `:expected`';
-    return ko(message, {path: opts.path, actual: value, expected: getName(type)});
+    return ko(message, {path: opts.path, actual: value, expected: type});
   }
 
   return Ok;
@@ -107,7 +107,7 @@ function validateStruct(value, type, opts) {
 
   if (!isValid) {
     var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be an `:expected`');
-    return ko(message, {path: opts.path, actual: value, expected: 'Obj'});
+    return ko(message, {path: opts.path, actual: value, expected: Obj});
   }
 
   var errors = [];
@@ -150,7 +150,7 @@ function validateSubtype(value, type, opts) {
   var predicate = type.meta.predicate;
   if (!predicate(value)) {
     var message = getMessage(opts.messages, ':predicate', ':jsonpath is `:actual`, should be a `:expected`');
-    return ko(message, {path: opts.path, actual: value, expected: getName(type)});
+    return ko(message, {path: opts.path, actual: value, expected: type});
   }
 
   return Ok;
@@ -163,7 +163,7 @@ function validateList(value, type, opts) {
 
   if (!isValid) {
     var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
-    return ko(message, {path: opts.path, actual: value, expected: 'Arr'});
+    return ko(message, {path: opts.path, actual: value, expected: Arr});
   }
 
   var errors = [];
@@ -190,7 +190,7 @@ function validateUnion(value, type, opts) {
 
   if (!Func.is(ctor)) {
     var message = getMessage(opts.messages, ':dispatch', ':jsonpath is `:actual`, should be a `:expected`');
-    return ko(message, {path: opts.path, actual: value, expected: getName(type)});
+    return ko(message, {path: opts.path, actual: value, expected: type});
   }
 
   var i = type.meta.types.indexOf(ctor);
@@ -211,7 +211,7 @@ function validateTuple(value, type, opts) {
 
   if (!isValid) {
     var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
-    return ko(message, {path: opts.path, actual: value, expected: 'Arr of length ' + len});
+    return ko(message, {path: opts.path, actual: value, expected: type});
   }
 
   var errors = [];
@@ -262,31 +262,11 @@ function validate(value, type, opts) {
   }
 }
 
-function toPropTypes(Struct) {
-  
-  var propTypes = {};
-  var props = Struct.meta.props;
-  
-  Object.keys(props).forEach(function (k) {
-    // React custom prop validator
-    // see http://facebook.github.io/react/docs/reusable-components.html
-    propTypes[k] = function (values, name, component) {
-      var opts = {
-        path: ['this.props.' + name], 
-        messages: ':path of value `:actual` supplied to `' + component + '`, expected a `:expected`'
-      };
-      return validate(values[name], props[name], opts).firstError();
-    }
-  });
-
-  return propTypes;
-}
-
-module.exports = {
-  // export tcomb for convenience
-  t: t,
+t.addons = t.addons || {};
+t.addons.validation = {
   Ok: Ok,
   Validation: Validation,
-  validate: validate,
-  toPropTypes: toPropTypes
+  validate: validate
 };
+
+module.exports = t;
