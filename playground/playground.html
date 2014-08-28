@@ -1,0 +1,256 @@
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>tcomb-validation playground</title>
+    
+    <link type="text/css" rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css"/>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script type="text/javascript" src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+
+    <!--
+    <link type="text/css" rel="stylesheet" href="dev/bootstrap.min.css"/>
+    <script src="dev/jquery-1.11.1.min.js"></script>
+    <script type="text/javascript" src="dev/bootstrap.min.js"></script>
+    -->
+    
+  </head>
+  <body>
+    <link type="text/css" rel="stylesheet" href="style.css"/>
+    <script src="JSXTransformer.min.js"></script>
+    <script src="underscore.min.js"></script>
+    <script src="backbone.js"></script>
+    <div id="app"></div>
+<script type="text/example" id="primitives">// null and undefined
+validate('a', Nil).isValid();       // => false
+validate(null, Nil).isValid();      // => true
+validate(undefined, Nil).isValid(); // => true
+
+// strings
+validate(1, Str).isValid();   // => false
+validate('a', Str).isValid(); // => true
+
+// numbers
+validate('a', Num).isValid(); // => false
+validate(1, Num).isValid();   // => true
+
+// booleans
+validate(1, Bool).isValid();    // => false
+validate(true, Bool).isValid(); // => true
+
+// optional values
+validate(null, maybe(Str)).isValid(); // => true
+validate('a', maybe(Str)).isValid();  // => true
+validate(1, maybe(Str)).isValid();    // => false
+
+// functions
+validate(1, Func).isValid();              // => false
+validate(function () {}, Func).isValid(); // => true
+
+// dates
+validate(1, Dat).isValid();           // => false
+validate(new Date(), Dat).isValid();  // => true
+
+// regexps
+validate(1, Re).isValid();    // => false
+validate(/^a/, Re).isValid(); // => true
+</script>
+<script type="text/example" id="subtypes">// a predicate is a function with signature: (x) -> boolean
+var predicate = function (x) { return x >= 0; };
+
+// a positive number
+var Positive = subtype(Num, predicate);
+
+validate(-1, Positive).isValid(); // => false
+validate(1, Positive).isValid();  // => true
+</script>
+<script type="text/example" id="objects">// an object with two numerical properties
+var Point = struct({
+  x: Num, 
+  y: Num
+});
+
+validate(null, Point).isValid();            // => false
+validate({x: 0}, Point).isValid();          // => false, y is missing
+validate({x: 0, y: 'a'}, Point).isValid();  // => false, y is not a number
+validate({x: 0, y: 0}, Point).isValid();    // => true
+</script>
+<script type="text/example" id="lists">// a list of strings
+var Words = list(Str);
+
+validate(null, Words).isValid();                  // => false
+validate(['hello', 1], Words).isValid();          // => false, [1] is not a string
+validate(['hello', 'world'], Words).isValid();    // => true
+</script>
+<script type="text/example" id="tuples">// a predicate is a function with signature: (x) -> boolean
+var predicate = function (x) { return x >= 0; };
+
+// a positive number
+var Positive = subtype(Num, predicate, 'Positive');
+
+// a tuple (width x height)
+var Size = tuple([Positive, Positive], 'Size');
+
+validate([1], Size).isValid();      // => false, height missing
+validate([1, -1], Size).isValid();  // => false, bad height
+validate([1, 2], Size).isValid();   // => true
+</script>
+<script type="text/example" id="enums">var CssTextAlign = enums.of('left right center justify', 'CssTextAlign');
+
+validate('bottom', CssTextAlign).isValid(); // => false
+validate('left', CssTextAlign).isValid();   // => true
+</script>
+<script type="text/example" id="unions">var CssLineHeight = union([Num, Str], 'CssLineHeight');
+
+// in order to make it work, we must implement the #dispath method
+CssLineHeight.dispatch = function (x) {
+  if (Num.is(x)) { return Num; }
+  else if (Str.is(x)) { return Str; }
+};
+
+validate(null, CssLineHeight).isValid();    // => false
+validate(1.4, CssLineHeight).isValid();     // => true
+validate('1.2em', CssLineHeight).isValid(); // => true
+</script>
+<script type="text/example" id="nested">// a list of strings
+var Words = list(Str);
+
+var Post = struct({
+  title: Str,
+  content: Str,
+  tags: Words
+});
+
+var mypost = {
+  title: 'Awesome!',
+  content: 'You can validate structures with arbitrary level of nesting',
+  tags: ['validation', 1] // <-- ouch!
+};
+
+validate(mypost, Post).isValid();     // => false
+validate(mypost, Post).firstError();  // => new Error('tags[1] is `1`, should be a `Str`')
+</script>
+<script type="text/example" id="jsonschema">// example taken from http://jsonschemalint.com/
+
+var Schema = struct({
+  foo: Num,
+  bar: enums.of('a b c')
+});
+
+var json = {
+  "foo": "this is a string, not a number", 
+  "bar": "this is a string that isn't allowed"
+};
+
+validate(json, Schema).isValid(); // => false
+</script>
+<script type="text/example" id="react">/** @jsx React.DOM */
+
+// define the component props
+var MyProps = struct({
+  foo: Num,
+  bar: subtype(Str, function (s) { return s.length <= 3; }, 'Bar')
+});
+
+// a simple component
+var MyComponent = React.createClass({
+  propTypes: toPropTypes(MyProps), // <--- !
+  render: function () {
+    return (
+      <div>
+        <div>Foo is: {this.props.foo}</div>
+        <div>Bar is: {this.props.bar}</div>
+      </div>
+    );
+  }    
+});
+
+// try to use bad props
+var props = {
+  "foo": "this is a string, not a number", 
+  "bar": "this is a string too long"
+};
+
+// rendering
+React.renderComponentToString(MyComponent(props));
+</script>
+<script type="text/example" id="react_debugging">/** @jsx React.DOM */
+
+//
+// if bad props are passed, the debugger kicks in
+//
+
+// define the component props
+var MyProps = struct({
+  foo: Num,
+  bar: subtype(Str, function (s) { return s.length <= 3; }, 'Bar')
+});
+
+var MyComponent = React.createClass({
+  render: function () {
+    this.props = MyProps(this.props); // <--- !
+    return (
+      <div>
+        <div>Foo is: {this.props.foo}</div>
+        <div>Bar is: {this.props.bar}</div>
+      </div>
+    );
+  }    
+});
+
+// try to use bad props
+var props = {
+  "foo": "this is a string, not a number", 
+  "bar": "this is a string too long"
+};
+
+// rendering
+React.renderComponentToString(MyComponent(props));
+</script>
+<script type="text/example" id="backbone">// attributes definition
+var Attrs = struct({
+  x: Num,
+  y: Num
+});
+
+var options = {validate: true};
+
+var Model = Backbone.Model.extend({
+  validate: function (attrs, options) {
+    return validate(attrs, Attrs).errors;
+  }
+});
+
+// first validation (OK)
+var model = new Model({x: 1, y: 2}, options);
+console.log(model.attributes); // => { x: 1, y: 2 }
+
+// second validation (KO)
+model.set({x: 'a'}, options);  // bad attribute
+console.log(model.attributes); // => { x: 1, y: 2 } attributes are unchanged
+</script>
+<script type="text/example" id="backbone_debugging">//
+// if bad attributes are passed, the debugger kicks in
+//
+
+var Attrs = struct({
+  x: Num,
+  y: Num
+});
+
+var options = {validate: true};
+
+var Model = Backbone.Model.extend({
+  validate: function (attrs, options) {
+    attrs = Attrs(attrs); // <--- !
+  }
+});
+
+// bad call
+var model = new Model({x: 1, y: 'a'}, options);
+</script>
+    <script src="playground.js"></script>
+  </body>
+</html>
+

@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "mocha",
-    "build": "browserify index.js -o build/tcomb-validation.js --standalone TcombValidation"
+    "build-playground": "watchify -v -t reactify playground/playground.jsx -o playground/playground.js"
   },
   "repository": {
     "type": "git",
@@ -24,7 +24,8 @@
     "mocha": "^1.21.4",
     "react": "^0.11.1",
     "backbone": "^1.1.2",
-    "sinon": "^1.10.3"
+    "sinon": "^1.10.3",
+    "tcomb-react-bootstrap": "^0.0.4"
   },
   "tags": [
     "validation"

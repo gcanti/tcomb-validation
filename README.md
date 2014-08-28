@@ -4,6 +4,10 @@
 
 General purpose validation library for JavaScript.
 
+# Playground
+
+Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/playground/playground.html)
+
 **Features**
 
 - concise yet expressive syntax
@@ -27,16 +31,16 @@ General purpose validation library for JavaScript.
   - [Form validation](#form-validation)
   - [JSON schema](#json-schema)
   - [An alternative syntax for React propTypes](#an-alternative-syntax-for-react-proptypes)
-  - [Full debugging support for React components](full-debugging-support-for-react-components)
+  - [Full debugging support for React components](#full-debugging-support-for-react-components)
   - [Backbone validation](#backbone-validation)
-  - [Full debugging support for Backbone models](full-debugging-support-for-backbone-models)
-- [Api reference](api-reference)
+  - [Full debugging support for Backbone models](#full-debugging-support-for-backbone-models)
+- [Api reference](#api-reference)
 
 # Basic usage
 
-If you don't know how to define types with tcomb you may want to take a look at its [README](https://github.com/gcanti/tcomb/blob/master/README.md) file.
+*If you don't know how to define types with tcomb you may want to take a look at its [README](https://github.com/gcanti/tcomb/blob/master/README.md) file.*
 
-The validate function:
+The main function is `validate`:
 
 ```js
 validate(value, spec) -> Validation
@@ -45,7 +49,7 @@ validate(value, spec) -> Validation
 - `value` the value to validate
 - `spec` a type defined with the [tcomb](https://github.com/gcanti/tcomb) library
 
-Returns a `Validation` object containing the result of the validation
+returns a `Validation` object containing the result of the validation
 
 Example
 
@@ -166,7 +170,7 @@ validate([1, 2], Size).isValid();   // => true
 var CssTextAlign = enums.of('left right center justify');
 
 validate('bottom', CssTextAlign).isValid(); // => false
-validate('left', CssTextAlign).isValid():   // => true
+validate('left', CssTextAlign).isValid();   // => true
 ```
 
 ## Unions
@@ -174,9 +178,15 @@ validate('left', CssTextAlign).isValid():   // => true
 ```js
 var CssLineHeight = union([Num, Str]);
 
+// in order to make it work, we must implement the #dispath method
+CssLineHeight.dispatch = function (x) {
+  if (Num.is(x)) { return Num; }
+  else if (Str.is(x)) { return Str; }
+};
+
 validate(null, CssLineHeight).isValid();    // => false
-validate(1.4, CssLineHeight).isValid():     // => true
-validate('1.2em', CssLineHeight).isValid(): // => true
+validate(1.4, CssLineHeight).isValid();     // => true
+validate('1.2em', CssLineHeight).isValid(); // => true
 ```
 
 ## Nested structures
@@ -296,7 +306,7 @@ var MyProps = struct({
   bar: subtype(Str, function (s) { return s.length <= 3; }, 'Bar')
 });
 
-// component definition
+// a simple component
 var MyComponent = React.createClass({
 
   propTypes: toPropTypes(MyProps), // <--- !
@@ -354,9 +364,13 @@ function toPropTypes(Struct) {
 A complete alternative to `propTypes` is adding this simple snippet to your `render` methods to obtain a full debugging support:
 
 ```js
+//
+// if bad props are passed, the debugger kicks in
+//
+
 var MyComponent = React.createClass({
   render: function () {
-    this.props = MyProps(this.props); // if bad props are passed, the debugger kicks in
+    this.props = MyProps(this.props); // <--- !
     return (
       <div>
         <div>Foo is: {this.props.foo}</div>
@@ -384,8 +398,11 @@ var Model = Backbone.Model.extend({
   }
 });
 
+// first validation (OK)
 var model = new Model({x: 1, y: 2}, options);
 console.log(model.attributes); // => { x: 1, y: 2 }
+
+// second validation (KO)
 model.set({x: 'a'}, options);  // bad attribute
 console.log(model.attributes); // => { x: 1, y: 2 } attributes are unchanged
 ```
@@ -395,10 +412,18 @@ console.log(model.attributes); // => { x: 1, y: 2 } attributes are unchanged
 To obtain a full debugging support simply modify the `validate` method:
 
 ```js
-validate: function (attrs, options) {
-  attrs = Attrs(attrs); // if bad attributes are passed, the debugger kicks in
-  return validate(attrs, Attrs).errors;
-}
+//
+// if bad attributes are passed, the debugger kicks in
+//
+
+var Model = Backbone.Model.extend({
+  validate: function (attrs, options) {
+    attrs = Attrs(attrs); // <--- !
+  }
+});
+
+// bad call
+var model = new Model({x: 1, y: 'a'}, options);
 ```
 
 # Api reference
