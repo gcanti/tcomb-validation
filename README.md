@@ -8,6 +8,8 @@ General purpose validation library for JavaScript.
 
 Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/playground/playground.html)
 
+# Overview
+
 **Features**
 
 - concise yet expressive syntax
