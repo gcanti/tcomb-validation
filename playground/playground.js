@@ -25596,6 +25596,9 @@ var scripts = {
   nested: {
     label: 'Nested structures'
   },
+  form: {
+    label: 'Form validation'
+  },
   jsonschema: {
     label: 'JSON Schema'
   },
@@ -25693,7 +25696,7 @@ var Footer = React.createClass({displayName: 'Footer',
             React.DOM.li(null, repo('tcomb-validation'), " ", React.DOM.i(null, "\"General purpose validation library for JavaScript\"")), 
             React.DOM.li(null, repo('tcomb'), " ", React.DOM.i(null, "\"Pragmatic runtime type checking for JavaScript \"")), 
             React.DOM.li(null, React.DOM.a({href: "http://facebook.github.io/react/index.html"}, "React.js")), 
-            React.DOM.li(null, React.DOM.a({href: "http://backbone.org"}, "Backbone.js"))
+            React.DOM.li(null, React.DOM.a({href: "http://backbonejs.org"}, "Backbone.js"))
           )
         )
       )
@@ -25791,8 +25794,25 @@ var Main = React.createClass({displayName: 'Main',
               onChange: this.onCodeChange})
           ), 
           Col({md: 6}, 
-            React.DOM.p({className: "lead"}, "Validation"), 
-            Validation({results: err instanceof Error ? err : results})
+             this.state.name === 'form' ? 
+              React.DOM.div(null, 
+                React.DOM.p({className: "lead"}, "Form"), 
+                React.DOM.form({id: "myform", role: "form", method: "post"}, 
+                  React.DOM.div({className: "form-group"}, 
+                    React.DOM.input({type: "text", id: "username", placeholder: "Username", className: "form-control"})
+                  ), 
+                  React.DOM.div({className: "form-group"}, 
+                    React.DOM.input({type: "password", id: "password", placeholder: "Password", className: "form-control"})
+                  ), 
+                  React.DOM.button({className: "btn btn-primary btn-block"}, "Sign in")
+                )
+              )
+              : 
+              React.DOM.div(null, 
+                React.DOM.p({className: "lead"}, "Validation"), 
+                Validation({results: err instanceof Error ? err : results})
+              )
+            
           )
         ), 
         React.DOM.hr(null), 

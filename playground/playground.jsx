@@ -122,6 +122,9 @@ var scripts = {
   nested: {
     label: 'Nested structures'
   },
+  form: {
+    label: 'Form validation'
+  },
   jsonschema: {
     label: 'JSON Schema'
   },
@@ -219,7 +222,7 @@ var Footer = React.createClass({
             <li>{repo('tcomb-validation')} <i>"General purpose validation library for JavaScript"</i></li>
             <li>{repo('tcomb')} <i>"Pragmatic runtime type checking for JavaScript "</i></li>
             <li><a href="http://facebook.github.io/react/index.html">React.js</a></li>
-            <li><a href="http://backbone.org">Backbone.js</a></li>
+            <li><a href="http://backbonejs.org">Backbone.js</a></li>
           </ul>
         </Col>
       </Row>
@@ -317,8 +320,25 @@ var Main = React.createClass({
               onChange={this.onCodeChange}/>
           </Col>
           <Col md={6}>
-            <p className="lead">Validation</p>
-            <Validation results={err instanceof Error ? err : results}/>
+            { this.state.name === 'form' ? 
+              <div>
+                <p className="lead">Form</p>
+                <form id="myform" role="form" method="post">
+                  <div className="form-group">
+                    <input type="text" id="username" placeholder="Username" className="form-control"/>
+                  </div>
+                  <div className="form-group">
+                    <input type="password" id="password" placeholder="Password" className="form-control"/>
+                  </div>
+                  <button className="btn btn-primary btn-block">Sign in</button>
+                </form>                
+              </div>
+              : 
+              <div>
+                <p className="lead">Validation</p>
+                <Validation results={err instanceof Error ? err : results}/>
+              </div>
+            }
           </Col>
         </Row>
         <hr/>

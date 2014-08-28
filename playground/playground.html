@@ -23,47 +23,47 @@
     <script src="backbone.js"></script>
     <div id="app"></div>
 <script type="text/example" id="primitives">// null and undefined
-validate('a', Nil).isValid();       // => false
-validate(null, Nil).isValid();      // => true
-validate(undefined, Nil).isValid(); // => true
+validate('a', Nil);
+validate(null, Nil);
+validate(undefined, Nil);
 
 // strings
-validate(1, Str).isValid();   // => false
-validate('a', Str).isValid(); // => true
+validate(1, Str);
+validate('a', Str);
 
 // numbers
-validate('a', Num).isValid(); // => false
-validate(1, Num).isValid();   // => true
+validate('a', Num);
+validate(1, Num);
 
 // booleans
-validate(1, Bool).isValid();    // => false
-validate(true, Bool).isValid(); // => true
+validate(1, Bool);
+validate(true, Bool);
 
 // optional values
-validate(null, maybe(Str)).isValid(); // => true
-validate('a', maybe(Str)).isValid();  // => true
-validate(1, maybe(Str)).isValid();    // => false
+validate(null, maybe(Str));
+validate('a', maybe(Str));
+validate(1, maybe(Str));
 
 // functions
-validate(1, Func).isValid();              // => false
-validate(function () {}, Func).isValid(); // => true
+validate(1, Func);
+validate(function () {}, Func);
 
 // dates
-validate(1, Dat).isValid();           // => false
-validate(new Date(), Dat).isValid();  // => true
+validate(1, Dat);
+validate(new Date(), Dat);
 
 // regexps
-validate(1, Re).isValid();    // => false
-validate(/^a/, Re).isValid(); // => true
+validate(1, Re);
+validate(/^a/, Re);
 </script>
 <script type="text/example" id="subtypes">// a predicate is a function with signature: (x) -> boolean
 var predicate = function (x) { return x >= 0; };
 
 // a positive number
-var Positive = subtype(Num, predicate);
+var Positive = subtype(Num, predicate, 'Positive');
 
-validate(-1, Positive).isValid(); // => false
-validate(1, Positive).isValid();  // => true
+validate(-1, Positive);
+validate(1, Positive);
 </script>
 <script type="text/example" id="objects">// an object with two numerical properties
 var Point = struct({
@@ -71,17 +71,17 @@ var Point = struct({
   y: Num
 });
 
-validate(null, Point).isValid();            // => false
-validate({x: 0}, Point).isValid();          // => false, y is missing
-validate({x: 0, y: 'a'}, Point).isValid();  // => false, y is not a number
-validate({x: 0, y: 0}, Point).isValid();    // => true
+validate(null, Point);
+validate({x: 0}, Point);
+validate({x: 0, y: 'a'}, Point);
+validate({x: 0, y: 0}, Point);
 </script>
 <script type="text/example" id="lists">// a list of strings
 var Words = list(Str);
 
-validate(null, Words).isValid();                  // => false
-validate(['hello', 1], Words).isValid();          // => false, [1] is not a string
-validate(['hello', 'world'], Words).isValid();    // => true
+validate(null, Words);
+validate(['hello', 1], Words);
+validate(['hello', 'world'], Words);
 </script>
 <script type="text/example" id="tuples">// a predicate is a function with signature: (x) -> boolean
 var predicate = function (x) { return x >= 0; };
@@ -92,14 +92,14 @@ var Positive = subtype(Num, predicate, 'Positive');
 // a tuple (width x height)
 var Size = tuple([Positive, Positive], 'Size');
 
-validate([1], Size).isValid();      // => false, height missing
-validate([1, -1], Size).isValid();  // => false, bad height
-validate([1, 2], Size).isValid();   // => true
+validate([1], Size);      // => height missing
+validate([1, -1], Size);  // => bad height
+validate([1, 2], Size);
 </script>
 <script type="text/example" id="enums">var CssTextAlign = enums.of('left right center justify', 'CssTextAlign');
 
-validate('bottom', CssTextAlign).isValid(); // => false
-validate('left', CssTextAlign).isValid();   // => true
+validate('bottom', CssTextAlign);
+validate('left', CssTextAlign);
 </script>
 <script type="text/example" id="unions">var CssLineHeight = union([Num, Str], 'CssLineHeight');
 
@@ -109,13 +109,14 @@ CssLineHeight.dispatch = function (x) {
   else if (Str.is(x)) { return Str; }
 };
 
-validate(null, CssLineHeight).isValid();    // => false
-validate(1.4, CssLineHeight).isValid();     // => true
-validate('1.2em', CssLineHeight).isValid(); // => true
+validate(null, CssLineHeight);
+validate(1.4, CssLineHeight);
+validate('1.2em', CssLineHeight);
 </script>
 <script type="text/example" id="nested">// a list of strings
 var Words = list(Str);
 
+// a nested structure
 var Post = struct({
   title: Str,
   content: Str,
@@ -128,8 +129,7 @@ var mypost = {
   tags: ['validation', 1] // <-- ouch!
 };
 
-validate(mypost, Post).isValid();     // => false
-validate(mypost, Post).firstError();  // => new Error('tags[1] is `1`, should be a `Str`')
+validate(mypost, Post);
 </script>
 <script type="text/example" id="jsonschema">// example taken from http://jsonschemalint.com/
 
@@ -143,7 +143,7 @@ var json = {
   "bar": "this is a string that isn't allowed"
 };
 
-validate(json, Schema).isValid(); // => false
+validate(json, Schema);
 </script>
 <script type="text/example" id="react">/** @jsx React.DOM */
 
@@ -155,7 +155,9 @@ var MyProps = struct({
 
 // a simple component
 var MyComponent = React.createClass({
+
   propTypes: toPropTypes(MyProps), // <--- !
+  
   render: function () {
     return (
       <div>
@@ -250,7 +252,38 @@ var Model = Backbone.Model.extend({
 // bad call
 var model = new Model({x: 1, y: 'a'}, options);
 </script>
+<script type="text/example" id="form">// Let's design the process for a simple sign in form:
+
+var SignInInfo = struct({
+  username: Str,
+  password: Str
+});
+
+$('#app').on('submit', '#myform', function (evt) {
+
+  // retrieves values from the UI
+  var formValues = {
+    username: $('#username').val().trim() || null,
+    password: $('#password').val().trim() || null
+  };
+
+  // validation
+  var result = validate(formValues, SignInInfo, {messages: ':path'});
+
+  // feedback
+  $('#myform .form-group').removeClass('has-error').addClass('has-success');
+  if (!result.isValid()) {
+    evt.preventDefault();
+    result.errors.forEach(function (err) {
+      $('#' + err.message).parent().addClass('has-error');
+    });
+  } else {
+    // send values to server..
+  }
+});
+</script>
     <script src="playground.js"></script>
+    <a href="https://github.com/gcanti/tcomb-validation"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a>
   </body>
 </html>
 
