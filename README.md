@@ -2,7 +2,7 @@
 
 ![tcomb logo](http://gcanti.github.io/resources/tcomb/logo.png)
 
-A brand new general purpose validation library for JavaScript
+A brand new **general purpose** validation library for JavaScript
 
 # Playground
 
@@ -16,6 +16,8 @@ Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/
 - validates native types, subtypes, objects, lists and tuples, enums, unions
 - validates structures with arbitrary level of nesting
 - detailed informations on failed validations
+- lightwheight alternative to JSON Schema (4K gzipped bundled with [tcomb](https://github.com/gcanti/tcomb))
+- easy integration with React (`propTypes`) and Backbone (`validate` implementation)
 - output messages are fully customizable
 - reuse your domain model written with [tcomb](https://github.com/gcanti/tcomb)
 
@@ -45,13 +47,13 @@ Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/
 The main function is `validate`:
 
 ```js
-validate(value, spec) -> Validation
+validate(value, spec) -> Result
 ```
 
 - `value` the value to validate
 - `spec` a type defined with the [tcomb](https://github.com/gcanti/tcomb) library
 
-returns a `Validation` object containing the result of the validation
+returns a `Result` object containing the result of the validation
 
 Example
 
@@ -413,15 +415,16 @@ var model = new Model({x: 1, y: 'a'}, options);
 
 # Api reference
 
-## Validation
+## Result
 
-`Validation` is a struct containing an `errors` prop which is:
+`Result` is a struct containing an `errors` prop which is:
 
 - a list of `Error` if validation fails 
 - or `null` if succeded.
 
 ```js
-var Validation = struct({
+// the definition of `Result`
+var Result = struct({
   errors: maybe(list(Err))
 });
 ```
@@ -442,7 +445,7 @@ Returns the first error or `null` if validation succeded.
 validate(1, Str).firstError(); // => new Error('value is `1`, should be a `Str`')
 ```  
 
-## validate(value, type, [opts]) -> Validation
+## validate(value, type, [opts]) -> Result
 
 - `value` the value to validate
 - `type` a type defined with the tcomb library
