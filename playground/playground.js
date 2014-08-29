@@ -25653,7 +25653,7 @@ var defaultExample = 'primitives';
 var results = [];
 window.validate = function (value, type, opts) {
   var result = v(value, type, opts);
-  //console.log(result);
+  console.log(result);
   results.push(result);
   return result;
 };
@@ -25671,7 +25671,7 @@ var Header = React.createClass({displayName: 'Header',
           React.DOM.p({className: "text-muted"}, "A brand new general purpose validation library for JavaScript"), 
           React.DOM.br(null), 
           React.DOM.p(null, 
-            "Concise yet expressive syntax, full debugging support, seamless integration with React and Backbone."
+            React.DOM.strong(null, "Concise yet expressive syntax, full debugging support, seamless integration with React and Backbone.")
           )
         ), 
         Col({md: 6}, 
@@ -25786,7 +25786,8 @@ var Main = React.createClass({displayName: 'Main',
         Header(null), 
         Row(null, 
           Col({md: 6}, 
-            React.DOM.p({className: "lead"}, "Choose an example"), 
+            React.DOM.p({className: "lead"}, "Choose a code example, or write your own"), 
+            React.DOM.p({className: "text-muted"}, "Open up the console for a complete debugging experience.."), 
             Example({name: this.state.name, onChange: this.onExampleChange}), 
             Input({
               type: "textarea", 
@@ -25809,7 +25810,7 @@ var Main = React.createClass({displayName: 'Main',
               )
               : 
               React.DOM.div(null, 
-                React.DOM.p({className: "lead"}, "Validation"), 
+                React.DOM.p({className: "lead"}, "Validation result"), 
                 Validation({results: err instanceof Error ? err : results})
               )
             

@@ -179,7 +179,7 @@ var defaultExample = 'primitives';
 var results = [];
 window.validate = function (value, type, opts) {
   var result = v(value, type, opts);
-  //console.log(result);
+  console.log(result);
   results.push(result);
   return result;
 };
@@ -197,7 +197,7 @@ var Header = React.createClass({
           <p className="text-muted">A brand new general purpose validation library for JavaScript</p>
           <br/>
           <p>
-            Concise yet expressive syntax, full debugging support, seamless integration with React and Backbone.
+            <strong>Concise yet expressive syntax, full debugging support, seamless integration with React and Backbone.</strong>
           </p>
         </Col>
         <Col md={6}>
@@ -312,7 +312,8 @@ var Main = React.createClass({
         <Header/>
         <Row>
           <Col md={6}>
-            <p className="lead">Choose an example</p>
+            <p className="lead">Choose a code example, or write your own</p>
+            <p className="text-muted">Open up the console for a complete debugging experience..</p>
             <Example name={this.state.name} onChange={this.onExampleChange}/>
             <Input
               type="textarea" 
@@ -335,7 +336,7 @@ var Main = React.createClass({
               </div>
               : 
               <div>
-                <p className="lead">Validation</p>
+                <p className="lead">Validation result</p>
                 <Validation results={err instanceof Error ? err : results}/>
               </div>
             }
