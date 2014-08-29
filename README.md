@@ -58,17 +58,18 @@ returns a `Result` object containing the result of the validation
 Example
 
 ```js
-var t = require('tcomb-validation');
-var validate = t.addons.validation.validate;
+var Tcomb = require('tcomb-validation');
+var validate = Tcomb.addons.validation.validate;
+var Str = Tcomb.Str; // a string type
 
-validate(1, t.Str).isValid();   // => false
-validate('a', t.Str).isValid(); // => true
+validate(1, Str).isValid();   // => false
+validate('a', Str).isValid(); // => true
 ```
 
 You can inspect the result to quickly identify what's wrong:
 
 ```js
-var result = validate(1, t.Str);
+var result = validate(1, Str);
 result.isValid();     // => false
 result.firstError();  // => new Error('value is `1`, should be a `Str`')
 
@@ -298,6 +299,8 @@ validate(json, Schema).isValid(); // => false
   new Error('bar is `"this is a string that isn\'t allowed"`, should be a `enums`')
 ]
 ```
+
+**Note**: A feature missing in standard JSON Schema is the powerful [subtype](#subtypes) syntax.
 
 ## An alternative syntax for React propTypes
 
