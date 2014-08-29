@@ -2,7 +2,7 @@
 
 ![tcomb logo](http://gcanti.github.io/resources/tcomb/logo.png)
 
-General purpose validation library for JavaScript.
+A brand new general purpose validation library for JavaScript
 
 # Playground
 
@@ -336,30 +336,7 @@ React.renderComponentToString(MyComponent(props));
 // => Warning: this.props.foo of value `"this is a string, not a number"` supplied to `undefined`, expected a `Num`
 // => Warning: Warning: this.props.bar of value `"this is a string too long"` supplied to `undefined`, expected a `Bar`
 ```
-
-where `toPropTypes` is a generic function accepting a struct:
-
-```js
-function toPropTypes(Struct) {
-  
-  var propTypes = {};
-  var props = Struct.meta.props;
-  
-  Object.keys(props).forEach(function (k) {
-    // React custom prop validator
-    // see http://facebook.github.io/react/docs/reusable-components.html
-    propTypes[k] = function (values, name, component) {
-      var opts = {
-        path: ['this.props.' + name], 
-        messages: ':path of value `:actual` supplied to `' + component + '`, expected a `:expected`'
-      };
-      return validate(values[name], props[name], opts).firstError();
-    }
-  });
-
-  return propTypes;
-}
-```
+*You can find the `toPropTypes` function [here](https://github.com/gcanti/tcomb-react)*
 
 ## Full debugging support for React components
 
@@ -369,6 +346,12 @@ A complete alternative to `propTypes` is adding this simple snippet to your `ren
 //
 // if bad props are passed, the debugger kicks in
 //
+// define the component props
+var MyProps = struct({
+  foo: Num,
+  bar: subtype(Str, function (s) { return s.length <= 3; }, 'Bar'),
+  children: Any
+});
 
 var MyComponent = React.createClass({
   render: function () {
