@@ -403,7 +403,7 @@ To obtain a full debugging support simply modify the `validate` method:
 
 var Model = Backbone.Model.extend({
   validate: function (attrs, options) {
-    attrs = Attrs(attrs); // <--- !
+    Attrs(attrs); // <--- !
   }
 });
 
