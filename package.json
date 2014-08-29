@@ -28,6 +28,10 @@
     "tcomb-react-bootstrap": "^0.0.4"
   },
   "tags": [
-    "validation"
+    "validation",
+    "JSON Schema",
+    "react",
+    "backbone",
+    "form validation"
   ]
 }

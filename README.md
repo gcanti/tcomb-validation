@@ -16,7 +16,7 @@ Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/
 - validates native types, subtypes, objects, lists and tuples, enums, unions
 - validates structures with arbitrary level of nesting
 - detailed informations on failed validations
-- lightwheight alternative to JSON Schema (4K gzipped bundled with [tcomb](https://github.com/gcanti/tcomb))
+- lightweight alternative to JSON Schema (4K gzipped bundled with [tcomb](https://github.com/gcanti/tcomb))
 - easy integration with React (`propTypes`) and Backbone (`validate` implementation)
 - output messages are fully customizable
 - reuse your domain model written with [tcomb](https://github.com/gcanti/tcomb)
