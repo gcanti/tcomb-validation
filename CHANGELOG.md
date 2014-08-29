@@ -1,9 +1,11 @@
 v.0.0.3
 
 - added JSON Path syntax
+- added placeholders for custom messages
 
 **BREAKING**
 
+- `Validation` renamed to `Result`
 - `validate` is now exported in `t.addons.validation.validate`
 - removed xpath format
 - complete refactoring of the message system
