@@ -23,23 +23,23 @@ var format = t.format;
 var mixin = t.mixin;
 
 //
-// Validation model
+// Result model
 //
 
-var Validation = struct({
+var Result = struct({
   errors: maybe(list(Err))
-}, 'Validation');
+}, 'Result');
 
-Validation.prototype.isValid = function() {
+Result.prototype.isValid = function() {
   return !(this.errors && this.errors.length);
 };
 
-Validation.prototype.firstError = function() {
+Result.prototype.firstError = function() {
   return this.isValid() ? null : this.errors[0];
 };
 
 // cache ok result
-var Ok = new Validation({errors: null});
+var Ok = new Result({errors: null});
 
 //
 // utils
@@ -60,7 +60,7 @@ function ko(message, params) {
   };
   var err = new Error(formatError(message, values));
   mixin(err, params);
-  return new Validation({errors: [err]});
+  return new Result({errors: [err]});
 }
 
 // TODO: optimize
@@ -114,16 +114,16 @@ function validateStruct(value, type, opts) {
   var props = type.meta.props;
   for (var k in props) {
     if (props.hasOwnProperty(k)) {
-      var validation = validate(value[k], props[k], {path: opts.path.concat([k]), messages: getMessage(opts.messages, k)});
-      if (!validation.isValid()) {
+      var result = validate(value[k], props[k], {path: opts.path.concat([k]), messages: getMessage(opts.messages, k)});
+      if (!result.isValid()) {
         isValid = false;
-        errors = errors.concat(validation.errors);
+        errors = errors.concat(result.errors);
       }
     }
   }
 
   if (!isValid) {
-    return new Validation({errors: errors});
+    return new Result({errors: errors});
   }
 
   return Ok;
@@ -142,9 +142,9 @@ function validateMaybe(value, type, opts) {
 function validateSubtype(value, type, opts) {
   assert(isType(type) && type.meta.kind === 'subtype');
 
-  var validation = validate(value, type.meta.type, {path: opts.path, messages: getMessage(opts.messages, ':type')});
-  if (!validation.isValid()) {
-    return validation;
+  var result = validate(value, type.meta.type, {path: opts.path, messages: getMessage(opts.messages, ':type')});
+  if (!result.isValid()) {
+    return result;
   }
 
   var predicate = type.meta.predicate;
@@ -168,15 +168,15 @@ function validateList(value, type, opts) {
 
   var errors = [];
   for (var i = 0, len = value.length ; i < len ; i++ ) {
-    var validation = validate(value[i], type.meta.type, {path: opts.path.concat([i]), messages: getMessage(opts.messages, ':type')});
-    if (!validation.isValid()) {
+    var result = validate(value[i], type.meta.type, {path: opts.path.concat([i]), messages: getMessage(opts.messages, ':type')});
+    if (!result.isValid()) {
       isValid = false;
-      errors = errors.concat(validation.errors);
+      errors = errors.concat(result.errors);
     }
   }
 
   if (!isValid) {
-    return new Validation({errors: errors});
+    return new Result({errors: errors});
   }
 
   return Ok;
@@ -194,9 +194,9 @@ function validateUnion(value, type, opts) {
   }
 
   var i = type.meta.types.indexOf(ctor);
-  var validation = validate(value, ctor, {path: opts.path, messages: getMessage(opts.messages, i)});
-  if (!validation.isValid()) {
-    return validation;
+  var result = validate(value, ctor, {path: opts.path, messages: getMessage(opts.messages, i)});
+  if (!result.isValid()) {
+    return result;
   }
 
   return Ok;
@@ -216,15 +216,15 @@ function validateTuple(value, type, opts) {
 
   var errors = [];
   for (var i = 0 ; i < len ; i++ ) {
-    var validation = validate(value[i], types[i], {path: opts.path.concat([i]), messages: getMessage(opts.messages, i)});
-    if (!validation.isValid()) {
+    var result = validate(value[i], types[i], {path: opts.path.concat([i]), messages: getMessage(opts.messages, i)});
+    if (!result.isValid()) {
       isValid = false;
-      errors = errors.concat(validation.errors);
+      errors = errors.concat(result.errors);
     }
   }
 
   if (!isValid) {
-    return new Validation({errors: errors});
+    return new Result({errors: errors});
   }
 
   return Ok;
@@ -265,7 +265,7 @@ function validate(value, type, opts) {
 t.addons = t.addons || {};
 t.addons.validation = {
   Ok: Ok,
-  Validation: Validation,
+  Result: Result,
   validate: validate
 };
 
