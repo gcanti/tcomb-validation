@@ -236,7 +236,7 @@ var formValues = {
 // if formValues = {username: null, password: 'password'}
 var result = validate(formValues, SignInInfo);
 result.isValid();     // => false
-result.firstError();  // => new Error('username is `undefined`, should be a `Str`')
+result.firstError();  // => new Error('username is `null`, should be a `Str`')
 ```
 
 You can customize the output to return your messages or simply the names of the invalid props for further processing:
