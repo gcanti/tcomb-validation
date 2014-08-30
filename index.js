@@ -230,6 +230,34 @@ function validateTuple(value, type, opts) {
   return Ok;
 }
 
+function validateDict(value, type, opts) {
+  assert(isType(type) && type.meta.kind === 'dict');
+
+  var isValid = Obj.is(value);
+
+  if (!isValid) {
+    var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
+    return ko(message, {path: opts.path, actual: value, expected: Obj});
+  }
+
+  var errors = [];
+  for (var k in value) {
+    if (value.hasOwnProperty(k)) {
+      var result = validate(value[k], type.meta.type, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':type')});
+      if (!result.isValid()) {
+        isValid = false;
+        errors = errors.concat(result.errors);
+      }
+    }
+  }
+
+  if (!isValid) {
+    return new Result({errors: errors});
+  }
+
+  return Ok;
+}
+
 var kinds = '`any`, `primitive`, `enums`, `struct`, `maybe`, `list`, `subtype`, `union`, `tuple`';
 
 function validate(value, type, opts) {
@@ -257,6 +285,8 @@ function validate(value, type, opts) {
       return validateUnion(value, type, opts);
     case 'tuple' :
       return validateTuple(value, type, opts);
+    case 'dict' :
+      return validateDict(value, type, opts);
     default :
       t.fail('Invalid kind `%s` supplied to `validate`, expected one of ' + kinds, kind);
   }

@@ -25,6 +25,7 @@ var enums = t.enums;
 var subtype = t.subtype;
 var struct = t.struct;
 var tuple = t.tuple;
+var dict = t.dict;
 
 //
 // setup
@@ -101,6 +102,8 @@ Price.dispatch = function (value) {
 
 var Size = tuple([Num, Num], 'Size');
 
+var Warranty = dict(Num, 'Warranty');
+
 var Product = struct({
   name:       Str,                  
   desc:       Description,
@@ -108,7 +111,8 @@ var Product = struct({
   shippings:  Shippings,       
   category:   Category,         
   price:      Price,
-  size:       Size
+  size:       Size,
+  warranty:   Warranty
 }, 'Product');
 
 //
@@ -234,6 +238,20 @@ describe('validate', function () {
     });
   });
 
+  describe('dict', function () {
+    it('should validate', function () {
+      eqv(validate({x: 1}, Warranty), Ok);
+      eqv(validate(1, Warranty), result('value is `1`, should be a `Obj`', [], 1, Obj));
+      eqv(validate({x: 'a'}, Warranty), result('["x"] is `"a"`, should be a `Num`', ['x'], 'a', Num));
+    });
+    it('should handle `messages` option', function () {
+      eqv(validate(1, Warranty, {messages: 'mymessage'}), result('mymessage', [], 1, Obj));
+      eqv(validate({x: 'a'}, Warranty, {messages: 'mymessage'}), result('mymessage', ['x'], 'a', Num));
+      eqv(validate(1, Warranty, {messages: {':input': 'should be a list'}}), result('should be a list', [], 1, Obj));
+      eqv(validate({x: 'a'}, Warranty, {messages: {':type': 'should be a string'}}), result('should be a string', ['x'], 'a', Num));
+    });
+  });
+
   describe('use cases', function () {
 
     var product = {
@@ -243,7 +261,11 @@ describe('validate', function () {
         shippings: ['Same Day', 'Next Businness Day'], 
         category: 'audio', 
         price: {currency: 'EUR', amount: 100}, 
-        size: [2.4, 4.2] 
+        size: [2.4, 4.2],
+        warranty: {
+          US: 2,
+          IT: 1
+        }
     };
 
     var getPatch = function (patch) {
@@ -261,7 +283,8 @@ describe('validate', function () {
         shippings:  {':input': 'shippings should be a list of strings', ':type': 'every element of shippings should be a string'},       
         category:   'category should be a valid enum',         
         price:      {':dispatch': 'price should be expressed in dollars or in another currency', 0: 'price should be a positive number', 1: {':struct': 'price should be an object', currency: 'currency should be a currency', amount: 'amount should be a positive number'}},
-        size:        {':input': 'size should be an array of length 2', 0: 'size.width should be a number', 1: 'size.height should be a number'}
+        size:        {':input': 'size should be an array of length 2', 0: 'size.width should be a number', 1: 'size.height should be a number'},
+        warranty:  {':input': 'warranty should be a dict of numbers', ':type': 'every element of warranty should be a number'},       
       };
 
       it('should return custom messages', function () {
@@ -293,6 +316,10 @@ describe('validate', function () {
         eqv(validate(p, Product, {messages: messages}), result('size should be an array of length 2', ['size'], [1, 2, 3], Size));
         p = getPatch({size: [1, 'a']});
         eqv(validate(p, Product, {messages: messages}), result('size.height should be a number', ['size', 1], 'a', Num));
+        p = getPatch({warranty: 1});
+        eqv(validate(p, Product, {messages: messages}), result('warranty should be a dict of numbers', ['warranty'], 1, Obj));
+        p = getPatch({warranty: {US: 'a'}});
+        eqv(validate(p, Product, {messages: messages}), result('every element of warranty should be a number', ['warranty', 'US'], 'a', Num));
       });
     });
 
@@ -330,6 +357,10 @@ describe('validate', function () {
         eqv(validate(p, Product, {messages: messages}), result('size', ['size'], [1, 2, 3], Size));
         p = getPatch({size: [1, 'a']});
         eqv(validate(p, Product, {messages: messages}), result('size.1', ['size', 1], 'a', Num));
+        p = getPatch({warranty: 1});
+        eqv(validate(p, Product, {messages: messages}), result('warranty', ['warranty'], 1, Obj));
+        p = getPatch({warranty: {US: 'a'}});
+        eqv(validate(p, Product, {messages: messages}), result('warranty.US', ['warranty', 'US'], 'a', Num));
       });
     });
 
@@ -378,7 +409,8 @@ describe('validate', function () {
           spy.getCall(3).args[0],
           spy.getCall(4).args[0],
           spy.getCall(5).args[0],
-          spy.getCall(6).args[0]
+          spy.getCall(6).args[0],
+          spy.getCall(7).args[0]
         ].sort();
 
         eq(calls[0], 'Warning: this.props.category of value `undefined` supplied to `ProductComponent`, expected a `Category`');
@@ -388,6 +420,7 @@ describe('validate', function () {
         eq(calls[4], 'Warning: this.props.price of value `undefined` supplied to `ProductComponent`, expected a `Price`');
         eq(calls[5], 'Warning: this.props.shippings of value `undefined` supplied to `ProductComponent`, expected a `Arr`');
         eq(calls[6], 'Warning: this.props.size of value `undefined` supplied to `ProductComponent`, expected a `Size`');
+        eq(calls[7], 'Warning: this.props.warranty of value `undefined` supplied to `ProductComponent`, expected a `Obj`');
 
         console.warn = warn;
       });

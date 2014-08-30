@@ -13,7 +13,7 @@ Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/
 **Features**
 
 - concise yet expressive syntax
-- validates native types, subtypes, objects, lists and tuples, enums, unions
+- validates native types, subtypes, objects, lists and tuples, enums, unions, dicts
 - validates structures with arbitrary level of nesting
 - detailed informations on failed validations
 - lightweight alternative to JSON Schema (4K gzipped bundled with [tcomb](https://github.com/gcanti/tcomb))
@@ -30,6 +30,7 @@ Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/
   - [Lists and tuples](#lists-and-tuples)
   - [Enums](#enums)
   - [Unions](#unions)
+  - [Dicts](#dicts)
   - [Nested structures](#nested-structures)
 - [Advanced usage and use cases](#advanced-usage-and-use-cases)
   - [Form validation](#form-validation)
@@ -192,6 +193,17 @@ CssLineHeight.dispatch = function (x) {
 validate(null, CssLineHeight).isValid();    // => false
 validate(1.4, CssLineHeight).isValid();     // => true
 validate('1.2em', CssLineHeight).isValid(); // => true
+```
+
+## Dicts
+
+```js
+// a dictionary of numbers
+var Warranty = dict(Num);
+
+validate(null, Warranty).isValid();             // => false
+validate({US: 2, IT: 'a'}, Warranty).isValid(); // => false, ['IT'] is not a number
+validate({US: 2, IT: 1}, Warranty).isValid();   // => true
 ```
 
 ## Nested structures
