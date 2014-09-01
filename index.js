@@ -19,7 +19,6 @@ var list = t.list;
 var isType = t.isType;
 var assert = t.assert;
 var getName = t.getName;
-var format = t.format;
 var mixin = t.mixin;
 
 //
@@ -89,8 +88,6 @@ function getMessage(messages, key, defaultMessage) {
 //
 
 function validatePrimitive(value, type, opts) {
-  assert(isType(type) && type.meta.kind in {any: 1, primitive: 1, enums: 1});
-  assert(maybe(Str).is(opts.messages));
 
   if (!type.is(value)) {
     var message = opts.messages || ':jsonpath is `:actual`, should be a `:expected`';
@@ -101,7 +98,6 @@ function validatePrimitive(value, type, opts) {
 }
 
 function validateStruct(value, type, opts) {
-  assert(isType(type) && type.meta.kind === 'struct');
 
   var isValid = Obj.is(value);
 
@@ -114,7 +110,7 @@ function validateStruct(value, type, opts) {
   var props = type.meta.props;
   for (var k in props) {
     if (props.hasOwnProperty(k)) {
-      var result = validate(value[k], props[k], {path: opts.path.concat([k]), messages: getMessage(opts.messages, k)});
+      var result = _validate(value[k], props[k], {path: opts.path.concat([k]), messages: getMessage(opts.messages, k)});
       if (!result.isValid()) {
         isValid = false;
         errors = errors.concat(result.errors);
@@ -133,16 +129,15 @@ function validateMaybe(value, type, opts) {
   assert(isType(type) && type.meta.kind === 'maybe');
 
   if (!Nil.is(value)) {
-    return validate(value, type.meta.type, opts);
+    return _validate(value, type.meta.type, opts);
   }
 
   return Ok;
 }
 
 function validateSubtype(value, type, opts) {
-  assert(isType(type) && type.meta.kind === 'subtype');
 
-  var result = validate(value, type.meta.type, {path: opts.path, messages: getMessage(opts.messages, ':type')});
+  var result = _validate(value, type.meta.type, {path: opts.path, messages: getMessage(opts.messages, ':type')});
   if (!result.isValid()) {
     return result;
   }
@@ -157,7 +152,6 @@ function validateSubtype(value, type, opts) {
 }
 
 function validateList(value, type, opts) {
-  assert(isType(type) && type.meta.kind === 'list');
 
   var isValid = Arr.is(value);
 
@@ -168,7 +162,7 @@ function validateList(value, type, opts) {
 
   var errors = [];
   for (var i = 0, len = value.length ; i < len ; i++ ) {
-    var result = validate(value[i], type.meta.type, {path: opts.path.concat([i]), messages: getMessage(opts.messages, ':type')});
+    var result = _validate(value[i], type.meta.type, {path: opts.path.concat([i]), messages: getMessage(opts.messages, ':type')});
     if (!result.isValid()) {
       isValid = false;
       errors = errors.concat(result.errors);
@@ -183,8 +177,6 @@ function validateList(value, type, opts) {
 }
 
 function validateUnion(value, type, opts) {
-  assert(isType(type) && type.meta.kind === 'union');
-  assert(Func.is(type.dispatch), 'unimplemented %s.dispatch()', getName(type));
 
   var ctor = type.dispatch(value);
 
@@ -194,7 +186,7 @@ function validateUnion(value, type, opts) {
   }
 
   var i = type.meta.types.indexOf(ctor);
-  var result = validate(value, ctor, {path: opts.path, messages: getMessage(opts.messages, i)});
+  var result = _validate(value, ctor, {path: opts.path, messages: getMessage(opts.messages, i)});
   if (!result.isValid()) {
     return result;
   }
@@ -203,7 +195,6 @@ function validateUnion(value, type, opts) {
 }
 
 function validateTuple(value, type, opts) {
-  assert(isType(type) && type.meta.kind === 'tuple');
 
   var types = type.meta.types;
   var len = types.length;
@@ -216,7 +207,7 @@ function validateTuple(value, type, opts) {
 
   var errors = [];
   for (var i = 0 ; i < len ; i++ ) {
-    var result = validate(value[i], types[i], {path: opts.path.concat([i]), messages: getMessage(opts.messages, i)});
+    var result = _validate(value[i], types[i], {path: opts.path.concat([i]), messages: getMessage(opts.messages, i)});
     if (!result.isValid()) {
       isValid = false;
       errors = errors.concat(result.errors);
@@ -231,7 +222,6 @@ function validateTuple(value, type, opts) {
 }
 
 function validateDict(value, type, opts) {
-  assert(isType(type) && type.meta.kind === 'dict');
 
   var isValid = Obj.is(value);
 
@@ -243,7 +233,7 @@ function validateDict(value, type, opts) {
   var errors = [];
   for (var k in value) {
     if (value.hasOwnProperty(k)) {
-      var result = validate(value[k], type.meta.type, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':type')});
+      var result = _validate(value[k], type.meta.type, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':type')});
       if (!result.isValid()) {
         isValid = false;
         errors = errors.concat(result.errors);
@@ -260,13 +250,7 @@ function validateDict(value, type, opts) {
 
 var kinds = '`any`, `primitive`, `enums`, `struct`, `maybe`, `list`, `subtype`, `union`, `tuple`';
 
-function validate(value, type, opts) {
-  opts = opts || {};
-  assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `validate`, expected a type', type);
-  assert(maybe(Arr).is(opts.path), 'Invalid argument `opts.path` of value `%j` supplied to `validate`, expected an `Arr`', opts.path);
-
-  opts.path = opts.path || [];
-
+function _validate(value, type, opts) {
   var kind = type.meta.kind;
   switch (kind) {
     case 'any' :
@@ -288,8 +272,18 @@ function validate(value, type, opts) {
     case 'dict' :
       return validateDict(value, type, opts);
     default :
-      t.fail('Invalid kind `%s` supplied to `validate`, expected one of ' + kinds, kind);
+      t.fail('Invalid kind');
   }
+}
+
+function validate(value, type, opts) {
+  opts = opts || {};
+  assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `validate`, expected a type', type);
+  assert(maybe(Arr).is(opts.path), 'Invalid argument `opts.path` of value `%j` supplied to `validate`, expected an `Arr`', opts.path);
+
+  opts.path = opts.path || [];
+
+  return _validate(value, type, opts);
 }
 
 t.addons = t.addons || {};
