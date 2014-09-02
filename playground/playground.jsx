@@ -99,34 +99,37 @@ t.options.onFail = function (message) {
 
 var scripts = {
   primitives: {
-    label: 'Primitives'
+    label: 'Primitives (Native JavaScript types)'
   },
   subtypes: {
-    label: 'Subtypes'
+    label: '`subtype` combinator (Subtypes)'
   },
   objects: {
-    label: 'Objects'
+    label: '`struct` combinator (Classes)'
   },
   lists: {
-    label: 'Lists'
+    label: '`list` combinator (Lists)'
   },
   tuples: {
-    label: 'Tuples'
+    label: '`tuple` combinator (Tuples)'
   },
   enums: {
-    label: 'Enums'
+    label: '`enums` combinator (Enums)'
   },
   unions: {
-    label: 'Unions'
+    label: '`union` combinator (Unions)'
+  },
+  dict: {
+    label: '`dict` combinator (Dictionaries)'
   },
   nested: {
-    label: 'Nested structures'
+    label: 'Validating nested structures'
   },
   form: {
     label: 'Form validation'
   },
   jsonschema: {
-    label: 'JSON Schema'
+    label: 'an alternative syntax for JSON Schema'
   },
   react: {
     label: 'React - an alternative syntax for propTypes'
@@ -170,7 +173,8 @@ var defaultExample = 'primitives';
   'subtype',
   'list',
   'tuple',
-  'enums'
+  'enums',
+  'dict'
 ]
 .forEach(function (name) {
   window[name] = t[name];
@@ -194,10 +198,10 @@ var Header = React.createClass({
       <Row className="header">
         <Col md={6}>
           <h1>{repo('tcomb-validation')} playground</h1>
-          <p className="text-muted">A brand new general purpose validation library for JavaScript</p>
+          <p className="text-muted">A JavaScript validation library based on type combinators</p>
           <br/>
           <p>
-            <strong>Concise yet expressive syntax, full debugging support, seamless integration with React and Backbone.</strong>
+            Concise yet expressive syntax, full debugging support, seamless integration with React and Backbone.
           </p>
         </Col>
         <Col md={6}>
@@ -279,6 +283,52 @@ var Validation = React.createClass({
   }
 });
 
+var CodeMirrorComponent = React.createClass({
+
+    updateCode: function(){
+      this.cm.setValue(this.props.code);
+    },
+
+    codeChanged: function(cm){
+      // set a flag so this doesn't cause a cm.setValue
+      this.userChangedCode = true;
+      this.props.onChange && this.props.onChange(cm.getValue());
+    },
+
+    // standard lifecycle methods
+    componentDidMount: function() {
+      // bind CodeMirror
+      this.cm = CodeMirror(this.getDOMNode(), {
+        mode: 'javascript',
+        lineNumbers: false,
+        lineWrapping: true,
+        smartIndent: false  // javascript mode does bad things with jsx indents
+      });
+      this.updateCode();
+      this.cm.on("change", this.codeChanged);
+    },
+
+    componentDidUpdate: function(){
+      this.updateCode();
+    },
+
+    componentWillUnmount: function(){
+      this.cm.off("change", this.codeChanged);
+    },
+
+    render: function() {
+      return (<div />);
+    },
+
+    shouldComponentUpdate: function(nextProps){
+      if (this.userChangedCode) {
+        this.userChangedCode = false;
+        return false;
+      }
+      return nextProps.code !== this.props.code;
+    }
+});
+
 var Main = React.createClass({
   getInitialState: function () {
     return {
@@ -300,8 +350,7 @@ var Main = React.createClass({
     isDebuggerEnabled = !!scripts[name].debug;
     this.setState({code: code, name: name});
   },
-  onCodeChange: function (evt) {
-    var code = evt.target.value;
+  onCodeChange: function (code) {
     this.setState({code: code, name: this.state.name});
   },
   render: function () {
@@ -313,12 +362,9 @@ var Main = React.createClass({
         <Row>
           <Col md={6}>
             <p className="lead">Choose a code example, or write your own</p>
-            <p className="text-muted">Open up the console for a complete debugging experience..</p>
             <Example name={this.state.name} onChange={this.onExampleChange}/>
-            <Input
-              type="textarea" 
-              value={this.state.code}
-              onChange={this.onCodeChange}/>
+            <p className="text-muted">Open up the console for a complete debugging experience..</p>
+            <CodeMirrorComponent code={this.state.code} onChange={this.onCodeChange}/>
           </Col>
           <Col md={6}>
             { this.state.name === 'form' ? 
@@ -354,6 +400,7 @@ var Main = React.createClass({
 //
 
 var main = React.renderComponent(Main(null), document.getElementById('app'));
+
 
 });
 

@@ -8,19 +8,16 @@
     <link type="text/css" rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css"/>
     <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
     <script type="text/javascript" src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+    <link type="text/css" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/4.5.0/codemirror.min.css"/>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/4.5.0/codemirror.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/4.5.0/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.6.0/underscore-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/0.11.1/JSXTransformer.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.1.2/backbone-min.js"></script>
+    <link type="text/css" rel="stylesheet" href="style.css"/>
 
-    <!--
-    <link type="text/css" rel="stylesheet" href="dev/bootstrap.min.css"/>
-    <script src="dev/jquery-1.11.1.min.js"></script>
-    <script type="text/javascript" src="dev/bootstrap.min.js"></script>
-    -->
-    
   </head>
   <body>
-    <link type="text/css" rel="stylesheet" href="style.css"/>
-    <script src="JSXTransformer.min.js"></script>
-    <script src="underscore.min.js"></script>
-    <script src="backbone.js"></script>
     <div id="app"></div>
 <script type="text/example" id="primitives">// null and undefined
 validate('a', Nil);
@@ -106,12 +103,19 @@ validate('left', CssTextAlign);
 // in order to make it work, we must implement the #dispath method
 CssLineHeight.dispatch = function (x) {
   if (Num.is(x)) { return Num; }
-  else if (Str.is(x)) { return Str; }
+  if (Str.is(x)) { return Str; }
 };
 
 validate(null, CssLineHeight);
 validate(1.4, CssLineHeight);
 validate('1.2em', CssLineHeight);
+</script>
+<script type="text/example" id="dict">// years of warranty per country
+var Warranty = dict(Num, 'Warranty');
+
+validate(null, Warranty);
+validate({US: 2}, Warranty);
+validate({US: 2, IT: 'a'}, Warranty);
 </script>
 <script type="text/example" id="nested">// a list of strings
 var Words = list(Str);

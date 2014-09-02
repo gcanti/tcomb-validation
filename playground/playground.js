@@ -20,7 +20,6 @@ var list = t.list;
 var isType = t.isType;
 var assert = t.assert;
 var getName = t.getName;
-var format = t.format;
 var mixin = t.mixin;
 
 //
@@ -90,8 +89,6 @@ function getMessage(messages, key, defaultMessage) {
 //
 
 function validatePrimitive(value, type, opts) {
-  assert(isType(type) && type.meta.kind in {any: 1, primitive: 1, enums: 1});
-  assert(maybe(Str).is(opts.messages));
 
   if (!type.is(value)) {
     var message = opts.messages || ':jsonpath is `:actual`, should be a `:expected`';
@@ -102,7 +99,6 @@ function validatePrimitive(value, type, opts) {
 }
 
 function validateStruct(value, type, opts) {
-  assert(isType(type) && type.meta.kind === 'struct');
 
   var isValid = Obj.is(value);
 
@@ -115,7 +111,7 @@ function validateStruct(value, type, opts) {
   var props = type.meta.props;
   for (var k in props) {
     if (props.hasOwnProperty(k)) {
-      var result = validate(value[k], props[k], {path: opts.path.concat([k]), messages: getMessage(opts.messages, k)});
+      var result = _validate(value[k], props[k], {path: opts.path.concat([k]), messages: getMessage(opts.messages, k)});
       if (!result.isValid()) {
         isValid = false;
         errors = errors.concat(result.errors);
@@ -134,16 +130,15 @@ function validateMaybe(value, type, opts) {
   assert(isType(type) && type.meta.kind === 'maybe');
 
   if (!Nil.is(value)) {
-    return validate(value, type.meta.type, opts);
+    return _validate(value, type.meta.type, opts);
   }
 
   return Ok;
 }
 
 function validateSubtype(value, type, opts) {
-  assert(isType(type) && type.meta.kind === 'subtype');
 
-  var result = validate(value, type.meta.type, {path: opts.path, messages: getMessage(opts.messages, ':type')});
+  var result = _validate(value, type.meta.type, {path: opts.path, messages: getMessage(opts.messages, ':type')});
   if (!result.isValid()) {
     return result;
   }
@@ -158,7 +153,6 @@ function validateSubtype(value, type, opts) {
 }
 
 function validateList(value, type, opts) {
-  assert(isType(type) && type.meta.kind === 'list');
 
   var isValid = Arr.is(value);
 
@@ -169,7 +163,7 @@ function validateList(value, type, opts) {
 
   var errors = [];
   for (var i = 0, len = value.length ; i < len ; i++ ) {
-    var result = validate(value[i], type.meta.type, {path: opts.path.concat([i]), messages: getMessage(opts.messages, ':type')});
+    var result = _validate(value[i], type.meta.type, {path: opts.path.concat([i]), messages: getMessage(opts.messages, ':type')});
     if (!result.isValid()) {
       isValid = false;
       errors = errors.concat(result.errors);
@@ -184,9 +178,8 @@ function validateList(value, type, opts) {
 }
 
 function validateUnion(value, type, opts) {
-  assert(isType(type) && type.meta.kind === 'union');
-  assert(Func.is(type.dispatch), 'unimplemented %s.dispatch()', getName(type));
 
+  assert(Func.is(type.dispatch), 'unimplemented %s.dispatch()', getName(type));
   var ctor = type.dispatch(value);
 
   if (!Func.is(ctor)) {
@@ -195,7 +188,7 @@ function validateUnion(value, type, opts) {
   }
 
   var i = type.meta.types.indexOf(ctor);
-  var result = validate(value, ctor, {path: opts.path, messages: getMessage(opts.messages, i)});
+  var result = _validate(value, ctor, {path: opts.path, messages: getMessage(opts.messages, i)});
   if (!result.isValid()) {
     return result;
   }
@@ -204,7 +197,6 @@ function validateUnion(value, type, opts) {
 }
 
 function validateTuple(value, type, opts) {
-  assert(isType(type) && type.meta.kind === 'tuple');
 
   var types = type.meta.types;
   var len = types.length;
@@ -217,7 +209,7 @@ function validateTuple(value, type, opts) {
 
   var errors = [];
   for (var i = 0 ; i < len ; i++ ) {
-    var result = validate(value[i], types[i], {path: opts.path.concat([i]), messages: getMessage(opts.messages, i)});
+    var result = _validate(value[i], types[i], {path: opts.path.concat([i]), messages: getMessage(opts.messages, i)});
     if (!result.isValid()) {
       isValid = false;
       errors = errors.concat(result.errors);
@@ -231,15 +223,36 @@ function validateTuple(value, type, opts) {
   return Ok;
 }
 
+function validateDict(value, type, opts) {
+
+  var isValid = Obj.is(value);
+
+  if (!isValid) {
+    var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
+    return ko(message, {path: opts.path, actual: value, expected: Obj});
+  }
+
+  var errors = [];
+  for (var k in value) {
+    if (value.hasOwnProperty(k)) {
+      var result = _validate(value[k], type.meta.type, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':type')});
+      if (!result.isValid()) {
+        isValid = false;
+        errors = errors.concat(result.errors);
+      }
+    }
+  }
+
+  if (!isValid) {
+    return new Result({errors: errors});
+  }
+
+  return Ok;
+}
+
 var kinds = '`any`, `primitive`, `enums`, `struct`, `maybe`, `list`, `subtype`, `union`, `tuple`';
 
-function validate(value, type, opts) {
-  opts = opts || {};
-  assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `validate`, expected a type', type);
-  assert(maybe(Arr).is(opts.path), 'Invalid argument `opts.path` of value `%j` supplied to `validate`, expected an `Arr`', opts.path);
-
-  opts.path = opts.path || [];
-
+function _validate(value, type, opts) {
   var kind = type.meta.kind;
   switch (kind) {
     case 'any' :
@@ -258,9 +271,21 @@ function validate(value, type, opts) {
       return validateUnion(value, type, opts);
     case 'tuple' :
       return validateTuple(value, type, opts);
+    case 'dict' :
+      return validateDict(value, type, opts);
     default :
-      t.fail('Invalid kind `%s` supplied to `validate`, expected one of ' + kinds, kind);
+      t.fail('Invalid kind');
   }
+}
+
+function validate(value, type, opts) {
+  opts = opts || {};
+  assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `validate`, expected a type', type);
+  assert(maybe(Arr).is(opts.path), 'Invalid argument `opts.path` of value `%j` supplied to `validate`, expected an `Arr`', opts.path);
+
+  opts.path = opts.path || [];
+
+  return _validate(value, type, opts);
 }
 
 t.addons = t.addons || {};
@@ -271,7 +296,7 @@ t.addons.validation = {
 };
 
 module.exports = t;
-},{"tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/AutoFocusMixin.js":[function(require,module,exports){
+},{"tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/AutoFocusMixin.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -18847,7 +18872,7 @@ var Model = model.create('Accordion', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Accordion":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Accordion.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Affix.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Accordion":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Accordion.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Affix.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/Affix');
@@ -18860,7 +18885,7 @@ var Model = model.create('Affix', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Affix":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Affix.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Alert.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Affix":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Affix.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Alert.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -18873,7 +18898,7 @@ var Model = model.create('Alert', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Alert":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Alert.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Badge.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Alert":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Alert.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Badge.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/Badge');
@@ -18884,7 +18909,7 @@ var Model = model.create('Badge', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Badge":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Badge.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Button.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Badge":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Badge.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Button.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -18900,7 +18925,7 @@ var Model = model.create('Button', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Button":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Button.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/ButtonGroup.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Button":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Button.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/ButtonGroup.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -18914,7 +18939,7 @@ var Model = model.create('ButtonGroup', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./Button":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Button.js","./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/ButtonGroup":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/ButtonGroup.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/ButtonToolbar.js":[function(require,module,exports){
+},{"./Button":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Button.js","./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/ButtonGroup":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/ButtonGroup.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/ButtonToolbar.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -18925,7 +18950,7 @@ var Model = model.create('ButtonToolbar', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/ButtonToolbar":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/ButtonToolbar.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Carousel.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/ButtonToolbar":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/ButtonToolbar.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Carousel.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -18946,7 +18971,7 @@ var Model = model.create('Carousel', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Carousel":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Carousel.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/CarouselItem.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Carousel":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Carousel.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/CarouselItem.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/CarouselItem');
@@ -18960,7 +18985,7 @@ var Model = model.create('CarouselItem', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/CarouselItem":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/CarouselItem.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Col.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/CarouselItem":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/CarouselItem.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Col.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/Col');
@@ -18987,7 +19012,7 @@ var Model = model.create('Col', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Col":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Col.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/DropdownButton.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Col":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Col.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/DropdownButton.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19006,7 +19031,7 @@ var Model = model.create('DropdownButton', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/DropdownButton":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/DropdownButton.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/DropdownMenu.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/DropdownButton":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/DropdownButton.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/DropdownMenu.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/DropdownMenu');
@@ -19018,7 +19043,7 @@ var Model = model.create('DropdownMenu', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/DropdownMenu":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/DropdownMenu.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Glyphicon.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/DropdownMenu":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/DropdownMenu.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Glyphicon.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19029,7 +19054,7 @@ var Model = model.create('Glyphicon', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Glyphicon":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Glyphicon.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Grid.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Glyphicon":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Glyphicon.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Grid.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/Grid');
@@ -19041,7 +19066,7 @@ var Model = model.create('Grid', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Grid":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Grid.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Input.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Grid":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Grid.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Input.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var EventableMixin = require('./util/EventableMixin');
@@ -19073,7 +19098,7 @@ var Model = model.create('Input', {
 }, [EventableMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/EventableMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/EventableMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Input":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Input.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Jumbotron.js":[function(require,module,exports){
+},{"./util/EventableMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/EventableMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Input":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Input.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Jumbotron.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/Jumbotron');
@@ -19083,7 +19108,7 @@ var Model = model.create('Jumbotron', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Jumbotron":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Jumbotron.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Label.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Jumbotron":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Jumbotron.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Label.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19094,7 +19119,7 @@ var Model = model.create('Label', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Label":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Label.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/MenuItem.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Label":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Label.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/MenuItem.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/MenuItem');
@@ -19110,7 +19135,7 @@ var Model = model.create('MenuItem', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/MenuItem":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/MenuItem.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Modal.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/MenuItem":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/MenuItem.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Modal.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19129,7 +19154,7 @@ var Model = model.create('Modal', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Modal":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Modal.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/ModalTrigger.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Modal":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Modal.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/ModalTrigger.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/ModalTrigger');
@@ -19141,7 +19166,7 @@ var Model = model.create('ModalTrigger', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/ModalTrigger":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/ModalTrigger.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Nav.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/ModalTrigger":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/ModalTrigger.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Nav.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/Nav');
@@ -19162,7 +19187,7 @@ var Model = model.create('Nav', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Nav":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Nav.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/NavItem.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Nav":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Nav.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/NavItem.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19179,7 +19204,7 @@ var Model = model.create('NavItem', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/NavItem":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/NavItem.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Navbar.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/NavItem":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/NavItem.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Navbar.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19201,7 +19226,7 @@ var Model = model.create('Navbar', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Navbar":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Navbar.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/OverlayTrigger.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Navbar":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Navbar.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/OverlayTrigger.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19225,7 +19250,7 @@ var Model = model.create('OverlayTrigger', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/OverlayTrigger":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/OverlayTrigger.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/PageHeader.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/OverlayTrigger":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/OverlayTrigger.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/PageHeader.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/PageHeader');
@@ -19235,7 +19260,7 @@ var Model = model.create('PageHeader', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/PageHeader":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/PageHeader.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/PageItem.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/PageHeader":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/PageHeader.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/PageItem.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/PageItem');
@@ -19250,7 +19275,7 @@ var Model = model.create('PageItem', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/PageItem":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/PageItem.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Pager.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/PageItem":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/PageItem.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Pager.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/Pager');
@@ -19261,7 +19286,7 @@ var Model = model.create('Pager', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Pager":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Pager.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Panel.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Pager":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Pager.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Panel.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19277,7 +19302,7 @@ var Model = model.create('Panel', {
 }, [BootstrapMixin, CollapsableMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/CollapsableMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/CollapsableMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Panel":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Panel.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/PanelGroup.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/CollapsableMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/CollapsableMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Panel":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Panel.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/PanelGroup.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19293,7 +19318,7 @@ var Model = model.create('PanelGroup', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/PanelGroup":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/PanelGroup.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Popover.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/PanelGroup":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/PanelGroup.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Popover.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19310,7 +19335,7 @@ var Model = model.create('Popover', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Popover":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Popover.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/ProgressBar.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Popover":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Popover.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/ProgressBar.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19328,7 +19353,7 @@ var Model = model.create('ProgressBar', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/ProgressBar":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/ProgressBar.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Row.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/ProgressBar":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/ProgressBar.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Row.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/Row');
@@ -19339,7 +19364,7 @@ var Model = model.create('Row', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Row":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Row.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/SplitButton.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Row":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Row.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/SplitButton.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19357,7 +19382,7 @@ var Model = model.create('SplitButton', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/SplitButton":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/SplitButton.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/SubNav.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/SplitButton":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/SplitButton.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/SubNav.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19374,7 +19399,7 @@ var Model = model.create('SubNav', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/SubNav":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/SubNav.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/TabPane.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/SubNav":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/SubNav.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/TabPane.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/TabPane');
@@ -19386,7 +19411,7 @@ var Model = model.create('TabPane', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/TabPane":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/TabPane.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/TabbedArea.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/TabPane":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/TabPane.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/TabbedArea.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/TabbedArea');
@@ -19402,7 +19427,7 @@ var Model = model.create('TabbedArea', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/TabbedArea":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/TabbedArea.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Table.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/TabbedArea":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/TabbedArea.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Table.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var Component = require('react-bootstrap/Table');
@@ -19417,7 +19442,7 @@ var Model = model.create('Table', {
 });
 
 module.exports = model.bind(Model, Component);
-},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Table":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Table.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Tooltip.js":[function(require,module,exports){
+},{"./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Table":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Table.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Tooltip.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19433,7 +19458,7 @@ var Model = model.create('Tooltip', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Tooltip":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Tooltip.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Well.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Tooltip":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Tooltip.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/Well.js":[function(require,module,exports){
 var t = require('tcomb');
 var model = require('./util/model');
 var BootstrapMixin = require('./util/BootstrapMixin');
@@ -19444,7 +19469,7 @@ var Model = model.create('Well', {
 }, [BootstrapMixin]);
 
 module.exports = model.bind(Model, Component);
-},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Well":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Well.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/index.js":[function(require,module,exports){
+},{"./util/BootstrapMixin":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js","./util/model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","react-bootstrap/Well":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/Well.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/index.js":[function(require,module,exports){
 module.exports = {
   Accordion: require('./Accordion'),
   Affix: require('./Affix'),
@@ -24147,156 +24172,9 @@ function merge(one, two) {
 }
 
 module.exports = merge;
-},{}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js":[function(require,module,exports){
-var t = require('tcomb');
-var model = require('./model');
-
-var BootstrapMixin = {
-  bsClass: t.maybe(model.BsClass),
-  bsStyle: t.maybe(model.BsStyle),
-  bsSize: t.maybe(model.BsSize)
-};
-
-module.exports = BootstrapMixin;
-},{"./model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/CollapsableMixin.js":[function(require,module,exports){
-var t = require('tcomb');
-
-var CollapsableMixin = {
-  collapsable: t.maybe(t.Bool),
-  defaultExpanded: t.maybe(t.Bool),
-  expanded: t.maybe(t.Bool)
-};
-
-module.exports = CollapsableMixin;
-},{"tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/EventableMixin.js":[function(require,module,exports){
-var t = require('tcomb');
-
-var EventableMixin = {
-  onClick: t.maybe(t.Func),
-  onChange: t.maybe(t.Func)
-};
-
-module.exports = EventableMixin;
-},{"tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js":[function(require,module,exports){
-var t = require('tcomb');
-var constants = require('react-bootstrap/constants');
-
-//
-// common types
-//
-
-var Children = t.Any;
-var Renderable = t.Any; // TODO: better typing of React.PropTypes.renderable
-var Key = t.union([t.Str, t.Num], 'Key');
-var Mountable = t.Any; // TODO better typing
-var Glyph = t.enums.of(constants.GLYPHS, 'Glyph');
-var Placement = t.enums.of('top right bottom left', 'Placement');
-var NavStyle = t.enums.of('tabs pills', 'NavStyle');
-var Direction = t.enums.of('prev next', 'Direction');
-var BsClass = t.enums(constants.CLASSES, 'BsClass');
-var BsStyle = t.enums(constants.STYLES, 'BsStyle');
-var BsSize = t.enums(constants.SIZES, 'BsSize');
-
-//
-// heavy lifting
-//
-
-function create(name, props, mixins) {
-  mix(props, mixins);
-  // HACK: add a synthetic name needed by bind()
-  props.__name__ = t.enums.of(name, name);
-  return t.struct(props, name);
-}
-
-function bind(Model, Component) {
-  var f = function (props) {
-    
-    // if there are no attributes React send null instead of {}
-    props = props || {};
-    
-    // HACK: add syntheticName prop
-    props.__name__ = Model.meta.name;
-    
-    // HACK: add children prop
-    if (arguments.length > 1) {
-      props.children = extractProps(Array.prototype.slice.call(arguments, 1));
-    }
-    
-    // forbid undefined props
-    checkForbiddenProps(t.getName(Model), props, Model.meta.props);
-    
-    // check types of allowed properties
-    arguments[0] = Model(props);
-    
-    // dispatch to react-bootstrap component
-    return Component.apply(Component, arguments);
-  };
-
-  // attach the model to the view
-  f.Model = Model;
-  
-  return f;
-}
-
-//
-// utils
-//
-
-function mix(props, mixins) {
-  if (mixins) {
-    props = mixins.reduce(function (acc, x) {
-      return t.mixin(acc, x);
-    }, props);
-  }
-  return props;
-}
-
-function extractProps(x) {
-  if (t.Arr.is(x)) {
-    return x.map(extractProps);
-  } else if (t.Obj.is(x)) {
-    var props = x.props;
-    if (x.children) {
-      props.children = extractProps(x.children);
-    }
-    return props;
-  }
-  return x;
-}
-
-function checkForbiddenProps(name, actualProps, expectedProps) {
-  for (var k in actualProps) {
-    if (actualProps.hasOwnProperty(k)) {
-      if (!expectedProps.hasOwnProperty(k)) {
-        t.fail(t.format('component `%s` does not handle property `%s`', name, k));
-      }
-    }
-  }
-}
-
-module.exports = {
-  create: create,
-  bind: bind,
-  Children: Children,
-  Renderable: Renderable,
-  Key: Key,
-  Mountable: Mountable,
-  Glyph: Glyph,
-  Placement: Placement,
-  NavStyle: NavStyle,
-  Direction: Direction,
-  BsSize: BsSize,
-  BsStyle: BsStyle,
-  BsClass: BsClass
-};
-},{"react-bootstrap/constants":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/constants.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/build/tcomb.js":[function(require,module,exports){
-//     tcomb 0.0.12
-//     https://github.com/gcanti/tcomb
-//     (c) 2014 Giulio Canti <giulio.canti@gmail.com>
-//     tcomb may be freely distributed under the MIT license.
-
+},{}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js":[function(require,module,exports){
 /**
-    # tcomb
+    % tcomb
 
     ![tcomb logo](http://gcanti.github.io/resources/tcomb/logo.png)
 
@@ -24304,7 +24182,17 @@ module.exports = {
     JavaScript values at runtime with a simple syntax. It is great for checking external input, 
     for testing and for **adding safety** to your internal code. 
 
-    Some features include:
+    # Contents
+
+    - [Features](#features)
+    - [Quick Examples](#quick-examples)
+    - [Setup](#setup)
+    - [Requirements](#requirements)
+    - [Tests](#tests)
+    - [The Idea](#the-idea)
+    - [Api](#api)
+
+    ## Features
 
     - **write complex domain models** in a breeze and with small code footprint
     - easy debugging
@@ -24339,6 +24227,7 @@ module.exports = {
     - tuple
     - subtype
     - list
+    - dict
     - function type (experimental)
 
     ## Quick Examples
@@ -24353,7 +24242,8 @@ module.exports = {
         shippings: list(Str),       // a list of shipping methods
         category: Category,         // enum, one of [audio, video]
         price: union(Num, Price),   // a price (dollars) OR in another currency
-        dim: tuple([Num, Num])      // dimensions (width, height)
+        size: tuple([Num, Num]),    // width x height
+        warranty: dict(Num)         // a dictionary country -> covered years
     });
 
     var Url = subtype(Str, function (s) {
@@ -24372,7 +24262,11 @@ module.exports = {
         shippings: ['Same Day', 'Next Businness Day'],
         category: 'audio',
         price: {currency: 'EUR', amount: 100},
-        dim: [2.4, 4.1]
+        size: [2.4, 4.1],
+        warranty: {
+          US: 2,
+          IT: 1
+        }
     };
 
     // get an immutable instance, `new` is optional
@@ -24414,9 +24308,9 @@ module.exports = {
 
         bower install tcomb
 
-    or download the `build/tcomb.js` file.
+    or download the `build/tcomb.min.js` file.
 
-    ### Requirements
+    ## Requirements
 
     This library uses a few ES5 methods
 
@@ -24497,16 +24391,16 @@ module.exports = {
   
       #### function `options.update`
   
-      TODO: better docs
-  
-      Adds to structs, tuples and lists a static method `update` that returns a new instance
+      Adds to structs, tuples, lists and dicts a static method `update` that returns a new instance
       without modifying the original.
   
       Example
   
       ```javascript
       // see http://facebook.github.io/react/docs/update.html
-      options.update = React.addons.update;
+      options.update = function (x, updates) {
+        return React.addons.update(mixin({}, x), updates);
+      };
       var p1  = Point({x: 0, y: 0});
       var p2 = Point.update(p1, {x: {$set: 1}}); // => Point({x: 1, y: 0})
       ```
@@ -24653,7 +24547,7 @@ module.exports = {
     /*jshint validthis:true*/
     var T = this;
     var args = slice.call(arguments);
-    var value = options.update.apply(T, args);
+    var value = options.update.apply(options.update, args);
     return T(value);
   }
 
@@ -24991,7 +24885,7 @@ module.exports = {
     assert(Obj.is(map), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'map', map, name, 'an `Obj`');
   
     // cache expected value
-    var expected = 'a `Str`';
+    var expected = 'a valid enum';
   
     function Enums(value) {
       forbidNewOperator(this, Enums);
@@ -25268,6 +25162,89 @@ module.exports = {
   }
 
   /**
+      ### dict(type, [name])
+  
+      Defines a dictionary Str -> type.
+  
+      - `type` the type of the values
+      - `name` optional string useful for debugging
+  
+      Example
+  
+      ```javascript
+      // defines a dictionary of numbers
+      var Tel = dict(Num);
+      ```
+  
+      #### is(x)
+  
+      Returns `true` if `x` is an instance of the dict.
+  
+      ```javascript
+      Tel.is({'jack': 4098, 'sape': 4139}); // => true
+      ```
+  **/
+
+  function dict(type, name) {
+  
+    // check combinator args
+    var combinator = 'dict';
+    name = ensureName(name, combinator, [type]);
+    assert(isType(type), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'type', type, combinator, 'a type');
+
+    // cache expected value
+    var expected = format('a dict of `%s`', getName(type));
+  
+    function Dict(value, mut) {
+  
+      forbidNewOperator(this, Dict);
+      assert(Obj.is(value), errs.ERR_BAD_TYPE_VALUE, value, name, expected);
+  
+      // makes Dict idempotent
+      if (Dict.isDict(value)) {
+        return value;
+      }
+  
+      var obj = {};
+      for (var k in value) {
+        if (value.hasOwnProperty(k)) {
+          var v = value[k];
+          obj[k] = type.is(v) ? v : type(v, mut);
+        }
+      }
+  
+      if (!mut) { 
+        Object.freeze(obj); 
+      }
+      return obj;
+    }
+  
+    Dict.meta = {
+      kind: 'dict',
+      type: type,
+      name: name
+    };
+  
+    Dict.isDict = function (x) {
+      for (var k in x) {
+        if (x.hasOwnProperty(k) && !type.is(x[k])) {
+          return false;
+        }
+      }
+      return true;
+    };
+  
+    Dict.is = function (x) {
+      return Obj.is(x) && Dict.isDict(x);
+    };
+  
+  
+    Dict.update = update;
+  
+    return Dict;
+  }
+
+  /**
       ### func(Arguments, f, [Return], [name])
   
       **Experimental**. Defines a function where the `arguments` and the return value are checked.
@@ -25338,7 +25315,6 @@ module.exports = {
   }
 
   return {
-    errs: errs,
     options: options,
     assert: assert,
     mixin: mixin,
@@ -25367,6 +25343,7 @@ module.exports = {
     tuple: tuple,
     subtype: subtype,
     list: list,
+    dict: dict,
     func: func
   };
 }));
@@ -25406,6 +25383,826 @@ module.exports = {
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 **/
+},{}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/BootstrapMixin.js":[function(require,module,exports){
+var t = require('tcomb');
+var model = require('./model');
+
+var BootstrapMixin = {
+  bsClass: t.maybe(model.BsClass),
+  bsStyle: t.maybe(model.BsStyle),
+  bsSize: t.maybe(model.BsSize)
+};
+
+module.exports = BootstrapMixin;
+},{"./model":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/CollapsableMixin.js":[function(require,module,exports){
+var t = require('tcomb');
+
+var CollapsableMixin = {
+  collapsable: t.maybe(t.Bool),
+  defaultExpanded: t.maybe(t.Bool),
+  expanded: t.maybe(t.Bool)
+};
+
+module.exports = CollapsableMixin;
+},{"tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/EventableMixin.js":[function(require,module,exports){
+var t = require('tcomb');
+
+var EventableMixin = {
+  onClick: t.maybe(t.Func),
+  onChange: t.maybe(t.Func)
+};
+
+module.exports = EventableMixin;
+},{"tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/util/model.js":[function(require,module,exports){
+var t = require('tcomb');
+var constants = require('react-bootstrap/constants');
+
+//
+// common types
+//
+
+var Children = t.Any;
+var Renderable = t.Any; // TODO: better typing of React.PropTypes.renderable
+var Key = t.union([t.Str, t.Num], 'Key');
+var Mountable = t.Any; // TODO better typing
+var Glyph = t.enums.of(constants.GLYPHS, 'Glyph');
+var Placement = t.enums.of('top right bottom left', 'Placement');
+var NavStyle = t.enums.of('tabs pills', 'NavStyle');
+var Direction = t.enums.of('prev next', 'Direction');
+var BsClass = t.enums(constants.CLASSES, 'BsClass');
+var BsStyle = t.enums(constants.STYLES, 'BsStyle');
+var BsSize = t.enums(constants.SIZES, 'BsSize');
+
+//
+// heavy lifting
+//
+
+function create(name, props, mixins) {
+  mix(props, mixins);
+  // HACK: add a synthetic name needed by bind()
+  props.__name__ = t.enums.of(name, name);
+  return t.struct(props, name);
+}
+
+function bind(Model, Component) {
+  var f = function (props) {
+    
+    // if there are no attributes React send null instead of {}
+    props = props || {};
+    
+    // HACK: add syntheticName prop
+    props.__name__ = Model.meta.name;
+    
+    // HACK: add children prop
+    if (arguments.length > 1) {
+      props.children = extractProps(Array.prototype.slice.call(arguments, 1));
+    }
+    
+    // forbid undefined props
+    checkForbiddenProps(t.getName(Model), props, Model.meta.props);
+    
+    // check types of allowed properties
+    arguments[0] = Model(props);
+    
+    // dispatch to react-bootstrap component
+    return Component.apply(Component, arguments);
+  };
+
+  // attach the model to the view
+  f.Model = Model;
+  
+  return f;
+}
+
+//
+// utils
+//
+
+function mix(props, mixins) {
+  if (mixins) {
+    props = mixins.reduce(function (acc, x) {
+      return t.mixin(acc, x);
+    }, props);
+  }
+  return props;
+}
+
+function extractProps(x) {
+  if (t.Arr.is(x)) {
+    return x.map(extractProps);
+  } else if (t.Obj.is(x)) {
+    var props = x.props;
+    if (x.children) {
+      props.children = extractProps(x.children);
+    }
+    return props;
+  }
+  return x;
+}
+
+function checkForbiddenProps(name, actualProps, expectedProps) {
+  for (var k in actualProps) {
+    if (actualProps.hasOwnProperty(k)) {
+      if (!expectedProps.hasOwnProperty(k)) {
+        t.fail(t.format('component `%s` does not handle property `%s`', name, k));
+      }
+    }
+  }
+}
+
+module.exports = {
+  create: create,
+  bind: bind,
+  Children: Children,
+  Renderable: Renderable,
+  Key: Key,
+  Mountable: Mountable,
+  Glyph: Glyph,
+  Placement: Placement,
+  NavStyle: NavStyle,
+  Direction: Direction,
+  BsSize: BsSize,
+  BsStyle: BsStyle,
+  BsClass: BsClass
+};
+},{"react-bootstrap/constants":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/react-bootstrap/constants.js","tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb-react-bootstrap/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/index.js":[function(require,module,exports){
+(function (root, factory) {
+  'use strict';
+  if (typeof define === 'function' && define.amd) {
+    define([], factory);
+  } else if (typeof exports === 'object') {
+    module.exports = factory();
+  } else {
+    root.t = factory();
+  }
+}(this, function () {
+
+  'use strict';
+
+  var failed = false;
+  
+  function onFail(message) {
+    // start debugger only once
+    if (!failed) {
+      /*jshint debug: true*/
+      debugger; 
+    }
+    failed = true;
+    throw new Error(message);
+  }
+  
+  var options = {
+    onFail: onFail,
+    update: null
+  };
+
+  function fail(message) {
+    options.onFail(message);
+  }
+  
+  function assert(guard) {
+    if (guard !== true) {
+      var args = slice.call(arguments, 1);
+      var message = args[0] ? format.apply(null, args) : 'assert failed';
+      fail(message); 
+    }
+  }
+
+  //
+  // utils
+  //
+  
+  var slice = Array.prototype.slice;
+  
+  var errs = {
+    ERR_BAD_TYPE_VALUE: 'Invalid type argument `value` of value `%j` supplied to `%s`, expected %s.',
+    ERR_BAD_COMBINATOR_ARGUMENT: 'Invalid combinator argument `%s` of value `%j` supplied to `%s`, expected %s.',
+    ERR_OPTIONS_UPDATE_MISSING: 'Missing `options.update` implementation',
+    ERR_NEW_OPERATOR_FORBIDDEN: 'Operator `new` is forbidden for `%s`'
+  };
+  
+  function mixin(target, source, overwrite) {
+    for (var k in source) {
+      if (source.hasOwnProperty(k)) {
+        if (!overwrite) {
+          assert(!target.hasOwnProperty(k), 'cannot overwrite property %s', k);
+        }
+        target[k] = source[k];
+      }
+    }
+    return target;
+  }
+  
+  function format() {
+    var args = slice.call(arguments);
+    var len = args.length;
+    var i = 1;
+    var message = args[0];
+  
+    function formatArgument(match, type) {
+      if (match === '%%') { return '%'; }       // handle escaping %
+      if (i >= len) { return match; }           // handle less arguments than placeholders
+      var formatter = format.formatters[type];
+      if (!formatter) { return match; }         // handle undefined formatters
+      return formatter(args[i++]);
+    }
+  
+    var str = message.replace(/%([a-z%])/g, formatArgument);
+    if (i < len) {
+      str += ' ' + args.slice(i).join(' ');     // handle more arguments than placeholders
+    }
+    return str;
+  }
+  
+  function replacer(key, value) {
+    if (typeof value === 'function') {
+      return format('Func', value.name);
+    }
+    return value;
+  }
+  
+  format.formatters = {
+    s: function (x) { return String(x); },
+    j: function (x) { return JSON.stringify(x, replacer); }
+  };
+  
+  function isType(type) {
+    return Func.is(type) && Obj.is(type.meta);
+  }
+  
+  function areTypes(types) {
+    return Arr.is(types) && types.every(isType);
+  }
+  
+  function getName(type) {
+    assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `getName()`, expected a type.', type);
+    return type.meta.name;
+  }
+
+  function getKind(type) {
+    assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `geKind()`, expected a type.', type);
+    return type.meta.kind;
+  }
+
+  function isKind(type, kind) {
+    return getKind(type) === kind;
+  }
+  
+  function values(obj) {
+    var ret = [];
+    for (var k in obj) {
+      if (obj.hasOwnProperty(k)) {
+        ret.push(obj[k]);
+      }
+    }
+    return ret;
+  }
+
+  function ensureName(name, defaultName, types) {
+    if (Nil.is(name)) {
+      if (areTypes(types)) {
+        return format(types.length > 1 ? '%s([%s])' : '%s(%s)', defaultName, types.map(getName).join(', '));
+      }
+      return defaultName;
+    }
+    assert(Str.is(name), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'name', name, defaultName, 'a `maybe(Str)`');
+    return name;
+  }
+  
+  // since in tcomb the only real constructors are those provided
+  // by `struct`, the `new` operator is forbidden for all types
+  function forbidNewOperator(x, T) {
+    assert(!(x instanceof T), errs.ERR_NEW_OPERATOR_FORBIDDEN, getName(T));
+  }
+  
+  function update() {
+    assert(Func.is(options.update), errs.ERR_OPTIONS_UPDATE_MISSING);
+    /*jshint validthis:true*/
+    var T = this;
+    var value = options.update.apply(T, arguments);
+    return T(value);
+  }
+
+  //
+  // irriducibles
+  //
+  
+  function irriducible(name, is) {
+  
+    function Irriducible(value) {
+      forbidNewOperator(this, Irriducible);
+      assert(is(value), errs.ERR_BAD_TYPE_VALUE, value, name, format('a `%s`', name));
+      // all primitives types are idempotent
+      return value;
+    }
+  
+    Irriducible.meta = {
+      kind: 'irriducible',
+      name: name
+    };
+  
+    Irriducible.is = is;
+  
+    return Irriducible;
+  }
+
+  var Any = irriducible('Any', function () {
+    return true;
+  });
+  
+  var Nil = irriducible('Nil', function (x) {
+    return x === null || x === undefined;
+  });
+  
+  var Str = irriducible('Str', function (x) {
+    return typeof x === 'string';
+  });
+  
+  var Num = irriducible('Num', function (x) {
+    return typeof x === 'number' && isFinite(x) && !isNaN(x);
+  });
+  
+  var Bool = irriducible('Bool', function (x) {
+    return x === true || x === false;
+  });
+  
+  var Arr = irriducible('Arr', function (x) {
+    return x instanceof Array;
+  });
+  
+  var Obj = irriducible('Obj', function (x) {
+    return !Nil.is(x) && typeof x === 'object' && !Arr.is(x);
+  });
+  
+  var Func = irriducible('Func', function (x) {
+    return typeof x === 'function';
+  });
+  
+  var Err = irriducible('Err', function (x) {
+    return x instanceof Error;
+  });
+  
+  var Re = irriducible('Re', function (x) {
+    return x instanceof RegExp;
+  });
+  
+  var Dat = irriducible('Dat', function (x) {
+    return x instanceof Date;
+  });
+  
+  function struct(props, name) {
+  
+    // check combinator args
+    name = ensureName(name, 'struct');
+    assert(Obj.is(props), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'props', props, name, 'an `Obj`');
+    assert(values(props).every(isType), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'props', props, name, 'a dict of types');
+  
+    function Struct(value, mut) {
+  
+      // makes Struct idempotent
+      if (Struct.is(value)) {
+        return value;
+      }
+  
+      assert(Obj.is(value), errs.ERR_BAD_TYPE_VALUE, value, name, 'an `Obj`');
+  
+      // makes `new` optional
+      if (!(this instanceof Struct)) { 
+        return new Struct(value, mut); 
+      }
+      
+      for (var k in props) {
+        if (props.hasOwnProperty(k)) {
+          this[k] = props[k](value[k], mut);
+        }
+      }
+  
+      if (!mut) { 
+        Object.freeze(this); 
+      }
+    }
+  
+    Struct.meta = {
+      kind: 'struct',
+      props: props,
+      name: name
+    };
+  
+    Struct.is = function (x) { 
+      return x instanceof Struct; 
+    };
+  
+    Struct.update = update;
+  
+    return Struct;
+  }
+
+  function union(types, name) {
+  
+    // check combinator args
+    var combinator = 'union';
+    name = ensureName(name, combinator, types);
+    assert(areTypes(types) && types.length >= 2, errs.ERR_BAD_COMBINATOR_ARGUMENT, 'types', types, combinator, 'a list(type) of length >= 2');
+  
+    function Union(value, mut) {
+      forbidNewOperator(this, Union);
+      assert(Func.is(Union.dispatch), 'unimplemented %s.dispatch()', name);
+      var T = Union.dispatch(value);
+      assert(isType(T), '%s.dispatch() returns no type', name);
+      // a union type is idempotent iif every T in types is idempotent
+      return T(value, mut);
+    }
+  
+    Union.meta = {
+      kind: 'union',
+      types: types,
+      name: name
+    };
+  
+    Union.is = function (x) {
+      return types.some(function (T) {
+        return T.is(x);
+      });
+    };
+  
+    // default dispatch implementation
+    Union.dispatch = function (x) {
+      for (var i = 0, len = types.length ; i < len ; i++ ) {
+        if (types[i].is(x)) {
+          return types[i];
+        }
+      }
+    };
+
+    return Union;
+  }
+
+  function maybe(type, name) {
+  
+    // check combinator args
+    var combinator = 'maybe';
+    name = ensureName(name, combinator, [type]);
+    assert(isType(type), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'type', type, combinator, 'a type');
+  
+    // makes the combinator idempotent
+    if (type.meta.kind === 'maybe') {
+      return type;
+    }
+  
+    function Maybe(value, mut) {
+      forbidNewOperator(this, Maybe);
+      // a maybe type is idempotent iif type is idempotent
+      return Nil.is(value) ? null : type(value, mut);
+    }
+  
+    Maybe.meta = {
+      kind: 'maybe',
+      type: type,
+      name: name
+    };
+  
+    Maybe.is = function (x) {
+      return Nil.is(x) || type.is(x);
+    };
+  
+    return Maybe;
+  }
+
+  function enums(map, name) {
+  
+    // check combinator args
+    name = ensureName(name, 'enums');
+    assert(Obj.is(map), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'map', map, name, 'an `Obj`');
+  
+    // cache expected value
+    var expected = 'a valid enum';
+  
+    function Enums(value) {
+      forbidNewOperator(this, Enums);
+      assert(Enums.is(value), errs.ERR_BAD_TYPE_VALUE, value, name, expected);
+      // all enums types are idempotent
+      return value;
+    }
+  
+    Enums.meta = {
+      kind: 'enums',
+      map: map,
+      name: name
+    };
+  
+    Enums.is = function (x) {
+      return Str.is(x) && map.hasOwnProperty(x);
+    };
+  
+    return Enums;
+  }
+  
+  enums.of = function (keys, name) {
+    keys = Str.is(keys) ? keys.split(' ') : keys;
+    var value = {};
+    keys.forEach(function (k) {
+      value[k] = k;
+    });
+    return enums(value, name);
+  };
+
+  function tuple(types, name) {
+  
+    // check combinator args
+    var combinator = 'tuple';
+    name = ensureName(name, combinator, types);
+    assert(areTypes(types) && types.length >= 2, errs.ERR_BAD_COMBINATOR_ARGUMENT, 'types', types, combinator, 'a list(type) of length >= 2');
+  
+    // cache types length
+    var len = types.length;
+    // cache expected value
+    var expected = format('a tuple `(%s)`', types.map(getName).join(', '));
+  
+    function Tuple(value, mut) {
+  
+      forbidNewOperator(this, Tuple);
+      assert(Arr.is(value) && value.length === len, errs.ERR_BAD_TYPE_VALUE, value, name, expected);
+  
+      // makes Tuple idempotent
+      if (Tuple.isTuple(value)) {
+        return value;
+      }
+  
+      var arr = [];
+      for (var i = 0 ; i < len ; i++) {
+        var T = types[i];
+        var v = value[i];
+        arr.push(T.is(v) ? v : T(v, mut));
+      }
+  
+      if (!mut) { 
+        Object.freeze(arr); 
+      }
+      return arr;
+    }
+  
+    Tuple.meta = {
+      kind: 'tuple',
+      types: types,
+      name: name
+    };
+  
+    Tuple.isTuple = function (x) {
+      return types.every(function (type, i) { 
+        return type.is(x[i]); 
+      });
+    };
+  
+    Tuple.is = function (x) {
+      return Arr.is(x) && x.length === len && Tuple.isTuple(x);
+    };
+  
+    Tuple.update = update;
+  
+    return Tuple;
+  }
+
+  function subtype(type, predicate, name) {
+  
+    // check combinator args
+    var combinator = 'subtype';
+    name = ensureName(name, combinator, [type]);
+    assert(isType(type), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'type', type, combinator, 'a type');
+    assert(Func.is(predicate), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'predicate', predicate, combinator, 'a `Func`');
+  
+    // cache expected value
+    var expected = predicate.__doc__ || 'a valid value for the predicate';
+  
+    function Subtype(value, mut) {
+      forbidNewOperator(this, Subtype);
+      // a subtype type is idempotent iif T is idempotent
+      var x = type(value, mut);
+      assert(predicate(x), errs.ERR_BAD_TYPE_VALUE, value, name, expected);
+      return x;
+    }
+  
+    Subtype.meta = {
+      kind: 'subtype',
+      type: type,
+      predicate: predicate,
+      name: name
+    };
+  
+    Subtype.is = function (x) {
+      return type.is(x) && predicate(x);
+    };
+  
+    /* fix #22
+    if (type.meta.kind === 'struct') {
+      // keep a reference to prototype to easily define new methods and attach them to supertype
+      Subtype.prototype = type.prototype;
+    }
+    */
+  
+    return Subtype;
+  }
+
+  function list(type, name) {
+  
+    // check combinator args
+    var combinator = 'list';
+    name = ensureName(name, combinator, [type]);
+    assert(isType(type), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'type', type, combinator, 'a type');
+  
+    // cache expected value
+    var expected = format('a list of `%s`', getName(type));
+  
+    function List(value, mut) {
+  
+      forbidNewOperator(this, List);
+      assert(Arr.is(value), errs.ERR_BAD_TYPE_VALUE, value, name, expected);
+  
+      // makes List idempotent
+      if (List.isList(value)) {
+        return value;
+      }
+  
+      var arr = [];
+      for (var i = 0, len = value.length ; i < len ; i++ ) {
+        var v = value[i];
+        arr.push(type(v, mut));
+      }
+  
+      if (!mut) { 
+        Object.freeze(arr); 
+      }
+      return arr;
+    }
+  
+    List.meta = {
+      kind: 'list',
+      type: type,
+      name: name
+    };
+  
+    List.isList = function (x) {
+      return x.every(type.is);
+    };
+  
+    List.is = function (x) {
+      return Arr.is(x) && List.isList(x);
+    };
+  
+  
+    List.update = update;
+  
+    return List;
+  }
+
+  function dict(type, name) {
+  
+    // check combinator args
+    var combinator = 'dict';
+    name = ensureName(name, combinator, [type]);
+    assert(isType(type), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'type', type, combinator, 'a type');
+
+    // cache expected value
+    var expected = format('a dict of `%s`', getName(type));
+  
+    function Dict(value, mut) {
+  
+      forbidNewOperator(this, Dict);
+      assert(Obj.is(value), errs.ERR_BAD_TYPE_VALUE, value, name, expected);
+  
+      // makes Dict idempotent
+      if (Dict.isDict(value)) {
+        return value;
+      }
+  
+      var obj = {};
+      for (var k in value) {
+        if (value.hasOwnProperty(k)) {
+          obj[k] = type(value[k], mut);
+        }
+      }
+  
+      if (!mut) { 
+        Object.freeze(obj); 
+      }
+      return obj;
+    }
+  
+    Dict.meta = {
+      kind: 'dict',
+      type: type,
+      name: name
+    };
+  
+    Dict.isDict = function (x) {
+      for (var k in x) {
+        if (x.hasOwnProperty(k) && !type.is(x[k])) {
+          return false;
+        }
+      }
+      return true;
+    };
+  
+    Dict.is = function (x) {
+      return Obj.is(x) && Dict.isDict(x);
+    };
+  
+  
+    Dict.update = update;
+  
+    return Dict;
+  }
+
+  function func(Arguments, f, Return, name) {
+  
+    name = name || 'func()';
+    Arguments = Arr.is(Arguments) ? tuple(Arguments, 'Arguments') : Arguments;
+    assert(isType(Arguments), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'Arguments', Arguments, name, 'a type or a list of types');
+    assert(Func.is(f), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'f', f, name, 'a `Func`');
+    assert(Nil.is(Return) || isType(Return), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'Return', Return, name, 'a type');
+  
+    // makes the combinator idempotent
+    Return = Return || null;
+    if (isType(f) && f.meta.Arguments === Arguments && f.meta.Return === Return) {
+      return f;
+    }
+  
+    function fn() {
+  
+      var args = slice.call(arguments);
+  
+      // handle optional arguments
+      if (args.length < f.length) {
+        args.length = f.length; 
+      }
+  
+      args = Arguments.is(args) ? args : Arguments(args);
+  
+      var r = f.apply(null, args);
+  
+      if (Return) {
+        r = Return.is(r) ? r : Return(r);
+      }
+  
+      return r;
+    }
+  
+    fn.is = function (x) { 
+      return x === fn; 
+    };
+  
+    fn.meta = {
+      kind: 'func',
+      Arguments: Arguments,
+      f: f,
+      Return: Return,
+      name: name
+    };
+  
+    return fn;
+  }
+
+  return {
+
+    util: {
+      mixin: mixin,
+      format: format,
+      isType: isType,
+      getName: getName,
+      getKind: getKind,
+      isKind: isKind,
+      values: values,
+      slice: slice
+    },
+
+    options: options,
+    assert: assert,
+    fail: fail,
+    
+    Any: Any,
+    Nil: Nil,
+    Str: Str,
+    Num: Num,
+    Bool: Bool,
+    Arr: Arr,
+    Obj: Obj,
+    Func: Func,
+    Err: Err,
+    Re: Re,
+    Dat: Dat,
+
+    irriducible: irriducible,
+    struct: struct,
+    enums: enums,
+    union: union,
+    maybe: maybe,
+    tuple: tuple,
+    subtype: subtype,
+    list: list,
+    dict: dict,
+    func: func
+  };
+}));
+
 },{}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/watchify/node_modules/browserify/node_modules/process/browser.js":[function(require,module,exports){
 // shim for using process in browser
 
@@ -25573,34 +26370,37 @@ t.options.onFail = function (message) {
 
 var scripts = {
   primitives: {
-    label: 'Primitives'
+    label: 'Primitives (Native JavaScript types)'
   },
   subtypes: {
-    label: 'Subtypes'
+    label: '`subtype` combinator (Subtypes)'
   },
   objects: {
-    label: 'Objects'
+    label: '`struct` combinator (Classes)'
   },
   lists: {
-    label: 'Lists'
+    label: '`list` combinator (Lists)'
   },
   tuples: {
-    label: 'Tuples'
+    label: '`tuple` combinator (Tuples)'
   },
   enums: {
-    label: 'Enums'
+    label: '`enums` combinator (Enums)'
   },
   unions: {
-    label: 'Unions'
+    label: '`union` combinator (Unions)'
+  },
+  dict: {
+    label: '`dict` combinator (Dictionaries)'
   },
   nested: {
-    label: 'Nested structures'
+    label: 'Validating nested structures'
   },
   form: {
     label: 'Form validation'
   },
   jsonschema: {
-    label: 'JSON Schema'
+    label: 'an alternative syntax for JSON Schema'
   },
   react: {
     label: 'React - an alternative syntax for propTypes'
@@ -25644,7 +26444,8 @@ var defaultExample = 'primitives';
   'subtype',
   'list',
   'tuple',
-  'enums'
+  'enums',
+  'dict'
 ]
 .forEach(function (name) {
   window[name] = t[name];
@@ -25668,10 +26469,10 @@ var Header = React.createClass({displayName: 'Header',
       Row({className: "header"}, 
         Col({md: 6}, 
           React.DOM.h1(null, repo('tcomb-validation'), " playground"), 
-          React.DOM.p({className: "text-muted"}, "A brand new general purpose validation library for JavaScript"), 
+          React.DOM.p({className: "text-muted"}, "A JavaScript validation library based on type combinators"), 
           React.DOM.br(null), 
           React.DOM.p(null, 
-            React.DOM.strong(null, "Concise yet expressive syntax, full debugging support, seamless integration with React and Backbone.")
+            "Concise yet expressive syntax, full debugging support, seamless integration with React and Backbone."
           )
         ), 
         Col({md: 6}, 
@@ -25753,6 +26554,52 @@ var Validation = React.createClass({displayName: 'Validation',
   }
 });
 
+var CodeMirrorComponent = React.createClass({displayName: 'CodeMirrorComponent',
+
+    updateCode: function(){
+      this.cm.setValue(this.props.code);
+    },
+
+    codeChanged: function(cm){
+      // set a flag so this doesn't cause a cm.setValue
+      this.userChangedCode = true;
+      this.props.onChange && this.props.onChange(cm.getValue());
+    },
+
+    // standard lifecycle methods
+    componentDidMount: function() {
+      // bind CodeMirror
+      this.cm = CodeMirror(this.getDOMNode(), {
+        mode: 'javascript',
+        lineNumbers: false,
+        lineWrapping: true,
+        smartIndent: false  // javascript mode does bad things with jsx indents
+      });
+      this.updateCode();
+      this.cm.on("change", this.codeChanged);
+    },
+
+    componentDidUpdate: function(){
+      this.updateCode();
+    },
+
+    componentWillUnmount: function(){
+      this.cm.off("change", this.codeChanged);
+    },
+
+    render: function() {
+      return (React.DOM.div(null));
+    },
+
+    shouldComponentUpdate: function(nextProps){
+      if (this.userChangedCode) {
+        this.userChangedCode = false;
+        return false;
+      }
+      return nextProps.code !== this.props.code;
+    }
+});
+
 var Main = React.createClass({displayName: 'Main',
   getInitialState: function () {
     return {
@@ -25774,8 +26621,7 @@ var Main = React.createClass({displayName: 'Main',
     isDebuggerEnabled = !!scripts[name].debug;
     this.setState({code: code, name: name});
   },
-  onCodeChange: function (evt) {
-    var code = evt.target.value;
+  onCodeChange: function (code) {
     this.setState({code: code, name: this.state.name});
   },
   render: function () {
@@ -25787,12 +26633,9 @@ var Main = React.createClass({displayName: 'Main',
         Row(null, 
           Col({md: 6}, 
             React.DOM.p({className: "lead"}, "Choose a code example, or write your own"), 
-            React.DOM.p({className: "text-muted"}, "Open up the console for a complete debugging experience.."), 
             Example({name: this.state.name, onChange: this.onExampleChange}), 
-            Input({
-              type: "textarea", 
-              value: this.state.code, 
-              onChange: this.onCodeChange})
+            React.DOM.p({className: "text-muted"}, "Open up the console for a complete debugging experience.."), 
+            CodeMirrorComponent({code: this.state.code, onChange: this.onCodeChange})
           ), 
           Col({md: 6}, 
              this.state.name === 'form' ? 
@@ -25828,6 +26671,7 @@ var Main = React.createClass({displayName: 'Main',
 //
 
 var main = React.renderComponent(Main(null), document.getElementById('app'));
+
 
 });
 

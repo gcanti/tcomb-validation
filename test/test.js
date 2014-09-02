@@ -26,6 +26,7 @@ var subtype = t.subtype;
 var struct = t.struct;
 var tuple = t.tuple;
 var dict = t.dict;
+var mixin = t.util.mixin;
 
 //
 // setup
@@ -269,7 +270,7 @@ describe('validate', function () {
     };
 
     var getPatch = function (patch) {
-      return t.mixin(t.mixin({}, product), patch, true);
+      return mixin(mixin({}, product), patch, true);
     };
 
     describe('custom messages', function () {

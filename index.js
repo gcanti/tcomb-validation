@@ -16,10 +16,10 @@ var struct = t.struct;
 var maybe = t.maybe;
 var list = t.list;
 
-var isType = t.isType;
+var isType = t.util.isType;
 var assert = t.assert;
-var getName = t.getName;
-var mixin = t.mixin;
+var getName = t.util.getName;
+var mixin = t.util.mixin;
 
 //
 // Result model
@@ -87,7 +87,7 @@ function getMessage(messages, key, defaultMessage) {
 // which are handled the same way
 //
 
-function validatePrimitive(value, type, opts) {
+function validateIrriducible(value, type, opts) {
 
   if (!type.is(value)) {
     var message = opts.messages || ':jsonpath is `:actual`, should be a `:expected`';
@@ -178,6 +178,7 @@ function validateList(value, type, opts) {
 
 function validateUnion(value, type, opts) {
 
+  assert(Func.is(type.dispatch), 'unimplemented %s.dispatch()', getName(type));
   var ctor = type.dispatch(value);
 
   if (!Func.is(ctor)) {
@@ -251,12 +252,11 @@ function validateDict(value, type, opts) {
 var kinds = '`any`, `primitive`, `enums`, `struct`, `maybe`, `list`, `subtype`, `union`, `tuple`';
 
 function _validate(value, type, opts) {
-  var kind = type.meta.kind;
+  var kind = t.util.getKind(type);
   switch (kind) {
-    case 'any' :
-    case 'primitive' :
+    case 'irriducible' :
     case 'enums' :
-      return validatePrimitive(value, type, opts);
+      return validateIrriducible(value, type, opts);
     case 'struct' :
       return validateStruct(value, type, opts);
     case 'maybe' :

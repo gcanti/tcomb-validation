@@ -12,8 +12,11 @@ body {
   padding: 40px 0 0 0;
 }
 
-textarea.form-control {
+.CodeMirror {
   font-family: Menlo, Consolas, monospace;
   font-size: 12px;
   height: 400px;
+  border: 1px solid #eee;
+  padding: 5px;
+  border-radius: 5px;
 }
