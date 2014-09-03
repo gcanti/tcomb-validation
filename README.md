@@ -316,6 +316,9 @@ validate(json, Schema).isValid(); // => false
 
 ## An alternative syntax for React propTypes
 
+**UPDATE**: since the last release of this library, I wrote a separate project to maximize the control 
+over React components, see [here](https://github.com/gcanti/tcomb-react).
+
 You can also use this library as an alternative syntax for the React.js `propTypes`, taking advantage of its expressive syntax:
 
 ```js
@@ -356,6 +359,9 @@ React.renderComponentToString(MyComponent(props));
 *You can find the `toPropTypes` function [here](https://github.com/gcanti/tcomb-react)*
 
 ## Full debugging support for React components
+
+**UPDATE**: since the last release of this library, I wrote a separate project to maximize the control 
+over React components, see [here](https://github.com/gcanti/tcomb-react).
 
 A complete alternative to `propTypes` is adding this simple snippet to your `render` methods to obtain a full debugging support:
 
