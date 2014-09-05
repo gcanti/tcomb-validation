@@ -18,9 +18,17 @@
   },
   "homepage": "https://github.com/gcanti/tcomb-validation",
   "dependencies": {
-    "tcomb": "*"
+    "tcomb": "~0.2.0"
   },
   "devDependencies": {
+    "grunt": "^0.4.5",
+    "grunt-cli": "^0.1.13",
+    "grunt-contrib-jshint": "^0.10.0",
+    "grunt-contrib-uglify": "^0.5.1",
+    "grunt-contrib-watch": "^0.6.1",
+    "grunt-mocha-test": "^0.11.0",
+    "istanbul": "^0.3.0",
+    "jshint-stylish": "^0.4.0",
     "mocha": "^1.21.4",
     "react": "^0.11.1",
     "backbone": "^1.1.2",
@@ -28,10 +36,6 @@
     "tcomb-react-bootstrap": "^0.0.4"
   },
   "tags": [
-    "validation",
-    "JSON Schema",
-    "react",
-    "backbone",
-    "form validation"
+    "validation"
   ]
 }

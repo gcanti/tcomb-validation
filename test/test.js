@@ -6,8 +6,9 @@ var React = require('react');
 var Backbone = require('Backbone');
 var sinon = require('sinon');
 
-var validate = t.addons.validation.validate;
-var Ok = t.addons.validation.Ok;
+var validate = t.validate;
+var Ok = validate.Ok;
+var Result = validate.Result;
 
 var Str = t.Str;
 var Num = t.Num;
@@ -70,7 +71,7 @@ function error(message, path, actual, expected) {
 }
 
 function result(message, path, actual, expected) {
-  return new t.addons.validation.Result({errors: [error(message, path, actual, expected)]});
+  return new Result({errors: [error(message, path, actual, expected)]});
 }
 
 //

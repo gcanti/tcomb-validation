@@ -1,3 +1,12 @@
+v0.1.0
+
+- added UMD
+
+**BREAKING**
+
+- remove the addons.validation namespace, fix #1
+- bower package, fix #2
+
 v.0.0.3
 
 - added JSON Path syntax
