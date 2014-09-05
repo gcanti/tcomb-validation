@@ -1,11 +1,11 @@
 v0.1.0
 
 - added UMD
+- bower package, fix #2
 
 **BREAKING**
 
 - remove the addons.validation namespace, fix #1
-- bower package, fix #2
 
 v.0.0.3
 
