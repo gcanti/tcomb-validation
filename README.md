@@ -523,7 +523,7 @@ console.log(result.errors);
 ]
 ```
 
-# Articles on tcomb
+# Articles on tcomb-validation
 
 - [JSON API Validation In Node.js](http://gcanti.github.io/2014/09/15/json-api-validation-in-node.html)
 
