@@ -40,6 +40,7 @@ Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/
   - [Backbone validation](#backbone-validation)
   - [Full debugging support for Backbone models](#full-debugging-support-for-backbone-models)
 - [Api reference](#api-reference)
+- [Articles on tcomb-validation](#articles-on-tcomb-validation)
 
 # Basic usage
 
@@ -521,6 +522,10 @@ console.log(result.errors);
   new Error('["y"] = undefined instead of a Num')
 ]
 ```
+
+# Articles on tcomb
+
+- [JSON API Validation In Node.js](http://gcanti.github.io/2014/09/15/json-api-validation-in-node.html)
 
 # Tests
 
