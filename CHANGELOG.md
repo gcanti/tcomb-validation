@@ -1,3 +1,7 @@
+v0.1.1
+
+- optimize `validateStruct`
+
 v0.1.0
 
 - added UMD

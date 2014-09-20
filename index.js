@@ -104,6 +104,10 @@
 
   function validateStruct(value, type, opts) {
 
+    if (type.is(value)) {
+      return Ok;
+    }
+
     var isValid = Obj.is(value);
 
     if (!isValid) {
