@@ -1,5 +1,10 @@
+.*
 *.log
+bower.json
+Grunfile.js
 node_modules
 test
-.gitattributes
-.gitignore
+coverage
+dev
+playground
+examples

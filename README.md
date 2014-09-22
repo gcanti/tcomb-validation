@@ -2,7 +2,7 @@
 
 ![tcomb logo](http://gcanti.github.io/resources/tcomb/logo.png)
 
-A brand new **general purpose** validation library for JavaScript
+A general purpose JavaScript validation library based on type combinators
 
 # Playground
 
