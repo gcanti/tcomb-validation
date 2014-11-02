@@ -22,7 +22,7 @@
   var maybe = t.maybe;
   var list = t.list;
 
-  var isType = t.util.isType;
+  var isType = t.Type.is;
   var assert = t.assert;
   var getName = t.util.getName;
   var mixin = t.util.mixin;
@@ -241,7 +241,12 @@
     var errors = [];
     for (var k in value) {
       if (value.hasOwnProperty(k)) {
-        var result = _validate(value[k], type.meta.type, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':type')});
+        var keyResult = _validate(k, type.meta.domain, {path: opts.path, messages: getMessage(opts.messages, ':domain')});
+        if (!keyResult.isValid()) {
+          isValid = false;
+          errors = errors.concat(result.errors);
+        }
+        var result = _validate(value[k], type.meta.codomain, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':codomain')});
         if (!result.isValid()) {
           isValid = false;
           errors = errors.concat(result.errors);

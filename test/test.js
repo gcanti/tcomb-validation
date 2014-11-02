@@ -104,7 +104,8 @@ Price.dispatch = function (value) {
 
 var Size = tuple([Num, Num], 'Size');
 
-var Warranty = dict(Num, 'Warranty');
+debugger
+var Warranty = dict(Str, Num, 'Warranty');
 
 var Product = struct({
   name:       Str,                  
@@ -250,7 +251,7 @@ describe('validate', function () {
       eqv(validate(1, Warranty, {messages: 'mymessage'}), result('mymessage', [], 1, Obj));
       eqv(validate({x: 'a'}, Warranty, {messages: 'mymessage'}), result('mymessage', ['x'], 'a', Num));
       eqv(validate(1, Warranty, {messages: {':input': 'should be a list'}}), result('should be a list', [], 1, Obj));
-      eqv(validate({x: 'a'}, Warranty, {messages: {':type': 'should be a string'}}), result('should be a string', ['x'], 'a', Num));
+      eqv(validate({x: 'a'}, Warranty, {messages: {':codomain': 'should be a string'}}), result('should be a string', ['x'], 'a', Num));
     });
   });
 
@@ -286,7 +287,7 @@ describe('validate', function () {
         category:   'category should be a valid enum',         
         price:      {':dispatch': 'price should be expressed in dollars or in another currency', 0: 'price should be a positive number', 1: {':struct': 'price should be an object', currency: 'currency should be a currency', amount: 'amount should be a positive number'}},
         size:        {':input': 'size should be an array of length 2', 0: 'size.width should be a number', 1: 'size.height should be a number'},
-        warranty:  {':input': 'warranty should be a dict of numbers', ':type': 'every element of warranty should be a number'},       
+        warranty:  {':input': 'warranty should be a dict of numbers', ':codomain': 'every element of warranty should be a number'},       
       };
 
       it('should return custom messages', function () {
