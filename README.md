@@ -185,7 +185,7 @@ validate('left', CssTextAlign).isValid();   // => true
 ```js
 var CssLineHeight = union([Num, Str]);
 
-// in order to make it work, we must implement the #dispath method
+// in order to make it work, we must implement the #dispatch method
 CssLineHeight.dispatch = function (x) {
   if (Num.is(x)) { return Num; }
   else if (Str.is(x)) { return Str; }
@@ -199,8 +199,9 @@ validate('1.2em', CssLineHeight).isValid(); // => true
 ## Dicts
 
 ```js
-// a dictionary of numbers
-var Warranty = dict(Num);
+// a dictionary mapping strings to numbers, note that while all dictionaries  have
+// string keys, it's possible to further restrict the domain of keys with subtyping.
+var Warranty = dict(Str, Num);
 
 validate(null, Warranty).isValid();             // => false
 validate({US: 2, IT: 'a'}, Warranty).isValid(); // => false, ['IT'] is not a number
