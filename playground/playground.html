@@ -101,12 +101,6 @@ validate('left', CssTextAlign);
 </script>
 <script type="text/example" id="unions">var CssLineHeight = union([Num, Str], 'CssLineHeight');
 
-// in order to make it work, we must implement the #dispath method
-CssLineHeight.dispatch = function (x) {
-  if (Num.is(x)) { return Num; }
-  if (Str.is(x)) { return Str; }
-};
-
 validate(null, CssLineHeight);
 validate(1.4, CssLineHeight);
 validate('1.2em', CssLineHeight);

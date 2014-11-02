@@ -1,7 +1,7 @@
 .*
 *.log
 bower.json
-Grunfile.js
+Gruntfile.js
 node_modules
 test
 coverage

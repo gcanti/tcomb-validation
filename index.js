@@ -87,9 +87,7 @@
   }
 
   //
-  // validation functions
-  // one for each kind expect for `any`, `primitive`, `enums` 
-  // which are handled the same way
+  // validation functions, one for each kind
   //
 
   function validateIrriducible(value, type, opts) {

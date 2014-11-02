@@ -1,301 +1,306 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({"/Users/giulio/Documents/Projects/github/tcomb-validation/index.js":[function(require,module,exports){
-'use strict';
+(function (root, factory) {
+  'use strict';
+  if (typeof define === 'function' && define.amd) {
+    define(['tcomb'], factory);
+  } else if (typeof exports === 'object') {
+    module.exports = factory(require('tcomb'));
+  } else {
+    root.t = factory(root.t);
+  }
+}(this, function (t) {
 
-var t = require('tcomb');
+  'use strict';
 
-var Any = t.Any;
-var Nil = t.Nil;
-var Bool = t.Bool;
-var Err = t.Err;
-var Str = t.Str;
-var Num = t.Num;
-var Arr = t.Arr;
-var Obj = t.Obj;
-var Func = t.Func;
+  var Nil = t.Nil;
+  var Err = t.Err;
+  var Str = t.Str;
+  var Arr = t.Arr;
+  var Obj = t.Obj;
+  var Func = t.Func;
 
-var struct = t.struct;
-var maybe = t.maybe;
-var list = t.list;
+  var struct = t.struct;
+  var maybe = t.maybe;
+  var list = t.list;
 
-var isType = t.isType;
-var assert = t.assert;
-var getName = t.getName;
-var mixin = t.mixin;
+  var isType = t.util.isType;
+  var assert = t.assert;
+  var getName = t.util.getName;
+  var mixin = t.util.mixin;
 
-//
-// Result model
-//
+  //
+  // Result model
+  //
 
-var Result = struct({
-  errors: maybe(list(Err))
-}, 'Result');
+  var Result = struct({
+    errors: maybe(list(Err))
+  }, 'Result');
 
-Result.prototype.isValid = function() {
-  return !(this.errors && this.errors.length);
-};
-
-Result.prototype.firstError = function() {
-  return this.isValid() ? null : this.errors[0];
-};
-
-// cache ok result
-var Ok = new Result({errors: null});
-
-//
-// utils
-//
-
-function toJSONPath(path) {
-  return path.map(function (prop) {
-    return '[' + JSON.stringify(prop) + ']';
-  }).join('');
-}
-
-function ko(message, params) {
-  var values = {
-    path: params.path.join('.') || 'value',
-    jsonpath: toJSONPath(params.path) || 'value',
-    actual: JSON.stringify(params.actual),
-    expected: getName(params.expected)
+  Result.prototype.isValid = function() {
+    return !(this.errors && this.errors.length);
   };
-  var err = new Error(formatError(message, values));
-  mixin(err, params);
-  return new Result({errors: [err]});
-}
 
-// TODO: optimize
-function formatError(message, params) {
-  for (var param in params) {
-    if (params.hasOwnProperty(param)) {
-      message = message.replace(new RegExp('\s?:' + param + '\s?', 'gim'), params[param]);
+  Result.prototype.firstError = function() {
+    return this.isValid() ? null : this.errors[0];
+  };
+
+  // cache ok result
+  var Ok = new Result({errors: null});
+
+  //
+  // utils
+  //
+
+  function toJSONPath(path) {
+    return path.map(function (prop) {
+      return '[' + JSON.stringify(prop) + ']';
+    }).join('');
+  }
+
+  function formatError(message, params) {
+    for (var param in params) {
+      if (params.hasOwnProperty(param)) {
+        message = message.replace(new RegExp(':' + param, 'gim'), params[param]);
+      }
     }
-  }
-  return message;
-}
-
-function getMessage(messages, key, defaultMessage) {
-  if (Obj.is(messages) && messages.hasOwnProperty(key)) {
-    return messages[key];
-  } else if (Str.is(messages)) {
-    return messages;
-  }
-  return defaultMessage;
-}
-
-//
-// validation functions
-// one for each kind expect for `any`, `primitive`, `enums` 
-// which are handled the same way
-//
-
-function validatePrimitive(value, type, opts) {
-
-  if (!type.is(value)) {
-    var message = opts.messages || ':jsonpath is `:actual`, should be a `:expected`';
-    return ko(message, {path: opts.path, actual: value, expected: type});
+    return message;
   }
 
-  return Ok;
-}
-
-function validateStruct(value, type, opts) {
-
-  var isValid = Obj.is(value);
-
-  if (!isValid) {
-    var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be an `:expected`');
-    return ko(message, {path: opts.path, actual: value, expected: Obj});
+  function ko(message, params) {
+    var values = {
+      path: params.path.join('.') || 'value',
+      jsonpath: toJSONPath(params.path) || 'value',
+      actual: JSON.stringify(params.actual),
+      expected: getName(params.expected)
+    };
+    var err = new Error(formatError(message, values));
+    mixin(err, params);
+    return new Result({errors: [err]});
   }
 
-  var errors = [];
-  var props = type.meta.props;
-  for (var k in props) {
-    if (props.hasOwnProperty(k)) {
-      var result = _validate(value[k], props[k], {path: opts.path.concat([k]), messages: getMessage(opts.messages, k)});
+  function getMessage(messages, key, defaultMessage) {
+    if (Obj.is(messages) && messages.hasOwnProperty(key)) {
+      return messages[key];
+    } else if (Str.is(messages)) {
+      return messages;
+    }
+    return defaultMessage;
+  }
+
+  //
+  // validation functions, one for each kind
+  //
+
+  function validateIrriducible(value, type, opts) {
+
+    if (!type.is(value)) {
+      var message = opts.messages || ':jsonpath is `:actual`, should be a `:expected`';
+      return ko(message, {path: opts.path, actual: value, expected: type});
+    }
+
+    return Ok;
+  }
+
+  function validateStruct(value, type, opts) {
+
+    if (type.is(value)) {
+      return Ok;
+    }
+
+    var isValid = Obj.is(value);
+
+    if (!isValid) {
+      var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be an `:expected`');
+      return ko(message, {path: opts.path, actual: value, expected: Obj});
+    }
+
+    var errors = [];
+    var props = type.meta.props;
+    for (var k in props) {
+      if (props.hasOwnProperty(k)) {
+        var result = _validate(value[k], props[k], {path: opts.path.concat([k]), messages: getMessage(opts.messages, k)});
+        if (!result.isValid()) {
+          isValid = false;
+          errors = errors.concat(result.errors);
+        }
+      }
+    }
+
+    if (!isValid) {
+      return new Result({errors: errors});
+    }
+
+    return Ok;
+  }
+
+  function validateMaybe(value, type, opts) {
+    assert(isType(type) && type.meta.kind === 'maybe');
+
+    if (!Nil.is(value)) {
+      return _validate(value, type.meta.type, opts);
+    }
+
+    return Ok;
+  }
+
+  function validateSubtype(value, type, opts) {
+
+    var result = _validate(value, type.meta.type, {path: opts.path, messages: getMessage(opts.messages, ':type')});
+    if (!result.isValid()) {
+      return result;
+    }
+
+    var predicate = type.meta.predicate;
+    if (!predicate(value)) {
+      var message = getMessage(opts.messages, ':predicate', ':jsonpath is `:actual`, should be a `:expected`');
+      return ko(message, {path: opts.path, actual: value, expected: type});
+    }
+
+    return Ok;
+  }
+
+  function validateList(value, type, opts) {
+
+    var isValid = Arr.is(value);
+
+    if (!isValid) {
+      var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
+      return ko(message, {path: opts.path, actual: value, expected: Arr});
+    }
+
+    var errors = [];
+    for (var i = 0, len = value.length ; i < len ; i++ ) {
+      var result = _validate(value[i], type.meta.type, {path: opts.path.concat([i]), messages: getMessage(opts.messages, ':type')});
       if (!result.isValid()) {
         isValid = false;
         errors = errors.concat(result.errors);
       }
     }
-  }
 
-  if (!isValid) {
-    return new Result({errors: errors});
-  }
-
-  return Ok;
-}
-
-function validateMaybe(value, type, opts) {
-  assert(isType(type) && type.meta.kind === 'maybe');
-
-  if (!Nil.is(value)) {
-    return _validate(value, type.meta.type, opts);
-  }
-
-  return Ok;
-}
-
-function validateSubtype(value, type, opts) {
-
-  var result = _validate(value, type.meta.type, {path: opts.path, messages: getMessage(opts.messages, ':type')});
-  if (!result.isValid()) {
-    return result;
-  }
-
-  var predicate = type.meta.predicate;
-  if (!predicate(value)) {
-    var message = getMessage(opts.messages, ':predicate', ':jsonpath is `:actual`, should be a `:expected`');
-    return ko(message, {path: opts.path, actual: value, expected: type});
-  }
-
-  return Ok;
-}
-
-function validateList(value, type, opts) {
-
-  var isValid = Arr.is(value);
-
-  if (!isValid) {
-    var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
-    return ko(message, {path: opts.path, actual: value, expected: Arr});
-  }
-
-  var errors = [];
-  for (var i = 0, len = value.length ; i < len ; i++ ) {
-    var result = _validate(value[i], type.meta.type, {path: opts.path.concat([i]), messages: getMessage(opts.messages, ':type')});
-    if (!result.isValid()) {
-      isValid = false;
-      errors = errors.concat(result.errors);
+    if (!isValid) {
+      return new Result({errors: errors});
     }
+
+    return Ok;
   }
 
-  if (!isValid) {
-    return new Result({errors: errors});
-  }
+  function validateUnion(value, type, opts) {
 
-  return Ok;
-}
+    assert(Func.is(type.dispatch), 'unimplemented %s.dispatch()', getName(type));
+    var ctor = type.dispatch(value);
 
-function validateUnion(value, type, opts) {
-
-  assert(Func.is(type.dispatch), 'unimplemented %s.dispatch()', getName(type));
-  var ctor = type.dispatch(value);
-
-  if (!Func.is(ctor)) {
-    var message = getMessage(opts.messages, ':dispatch', ':jsonpath is `:actual`, should be a `:expected`');
-    return ko(message, {path: opts.path, actual: value, expected: type});
-  }
-
-  var i = type.meta.types.indexOf(ctor);
-  var result = _validate(value, ctor, {path: opts.path, messages: getMessage(opts.messages, i)});
-  if (!result.isValid()) {
-    return result;
-  }
-
-  return Ok;
-}
-
-function validateTuple(value, type, opts) {
-
-  var types = type.meta.types;
-  var len = types.length;
-  var isValid = Arr.is(value) && value.length === len;
-
-  if (!isValid) {
-    var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
-    return ko(message, {path: opts.path, actual: value, expected: type});
-  }
-
-  var errors = [];
-  for (var i = 0 ; i < len ; i++ ) {
-    var result = _validate(value[i], types[i], {path: opts.path.concat([i]), messages: getMessage(opts.messages, i)});
-    if (!result.isValid()) {
-      isValid = false;
-      errors = errors.concat(result.errors);
+    if (!Func.is(ctor)) {
+      var message = getMessage(opts.messages, ':dispatch', ':jsonpath is `:actual`, should be a `:expected`');
+      return ko(message, {path: opts.path, actual: value, expected: type});
     }
+
+    var i = type.meta.types.indexOf(ctor);
+    var result = _validate(value, ctor, {path: opts.path, messages: getMessage(opts.messages, i)});
+    if (!result.isValid()) {
+      return result;
+    }
+
+    return Ok;
   }
 
-  if (!isValid) {
-    return new Result({errors: errors});
-  }
+  function validateTuple(value, type, opts) {
 
-  return Ok;
-}
+    var types = type.meta.types;
+    var len = types.length;
+    var isValid = Arr.is(value) && value.length === len;
 
-function validateDict(value, type, opts) {
+    if (!isValid) {
+      var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
+      return ko(message, {path: opts.path, actual: value, expected: type});
+    }
 
-  var isValid = Obj.is(value);
-
-  if (!isValid) {
-    var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
-    return ko(message, {path: opts.path, actual: value, expected: Obj});
-  }
-
-  var errors = [];
-  for (var k in value) {
-    if (value.hasOwnProperty(k)) {
-      var result = _validate(value[k], type.meta.type, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':type')});
+    var errors = [];
+    for (var i = 0 ; i < len ; i++ ) {
+      var result = _validate(value[i], types[i], {path: opts.path.concat([i]), messages: getMessage(opts.messages, i)});
       if (!result.isValid()) {
         isValid = false;
         errors = errors.concat(result.errors);
       }
     }
+
+    if (!isValid) {
+      return new Result({errors: errors});
+    }
+
+    return Ok;
   }
 
-  if (!isValid) {
-    return new Result({errors: errors});
+  function validateDict(value, type, opts) {
+
+    var isValid = Obj.is(value);
+
+    if (!isValid) {
+      var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
+      return ko(message, {path: opts.path, actual: value, expected: Obj});
+    }
+
+    var errors = [];
+    for (var k in value) {
+      if (value.hasOwnProperty(k)) {
+        var result = _validate(value[k], type.meta.type, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':type')});
+        if (!result.isValid()) {
+          isValid = false;
+          errors = errors.concat(result.errors);
+        }
+      }
+    }
+
+    if (!isValid) {
+      return new Result({errors: errors});
+    }
+
+    return Ok;
   }
 
-  return Ok;
-}
-
-var kinds = '`any`, `primitive`, `enums`, `struct`, `maybe`, `list`, `subtype`, `union`, `tuple`';
-
-function _validate(value, type, opts) {
-  var kind = type.meta.kind;
-  switch (kind) {
-    case 'any' :
-    case 'primitive' :
-    case 'enums' :
-      return validatePrimitive(value, type, opts);
-    case 'struct' :
-      return validateStruct(value, type, opts);
-    case 'maybe' :
-      return validateMaybe(value, type, opts);
-    case 'list' :
-      return validateList(value, type, opts);
-    case 'subtype' :
-      return validateSubtype(value, type, opts);
-    case 'union' :
-      return validateUnion(value, type, opts);
-    case 'tuple' :
-      return validateTuple(value, type, opts);
-    case 'dict' :
-      return validateDict(value, type, opts);
-    default :
-      t.fail('Invalid kind');
+  function _validate(value, type, opts) {
+    var kind = t.util.getKind(type);
+    switch (kind) {
+      case 'irriducible' :
+      case 'enums' :
+        return validateIrriducible(value, type, opts);
+      case 'struct' :
+        return validateStruct(value, type, opts);
+      case 'maybe' :
+        return validateMaybe(value, type, opts);
+      case 'list' :
+        return validateList(value, type, opts);
+      case 'subtype' :
+        return validateSubtype(value, type, opts);
+      case 'union' :
+        return validateUnion(value, type, opts);
+      case 'tuple' :
+        return validateTuple(value, type, opts);
+      case 'dict' :
+        return validateDict(value, type, opts);
+      default :
+        t.fail('Invalid kind');
+    }
   }
-}
 
-function validate(value, type, opts) {
-  opts = opts || {};
-  assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `validate`, expected a type', type);
-  assert(maybe(Arr).is(opts.path), 'Invalid argument `opts.path` of value `%j` supplied to `validate`, expected an `Arr`', opts.path);
+  function validate(value, type, opts) {
+    opts = opts || {};
+    assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `validate`, expected a type', type);
+    assert(maybe(Arr).is(opts.path), 'Invalid argument `opts.path` of value `%j` supplied to `validate`, expected an `Arr`', opts.path);
 
-  opts.path = opts.path || [];
+    opts.path = opts.path || [];
 
-  return _validate(value, type, opts);
-}
+    return _validate(value, type, opts);
+  }
 
-t.addons = t.addons || {};
-t.addons.validation = {
-  Ok: Ok,
-  Result: Result,
-  validate: validate
-};
+  // exports
+  validate.Ok = Ok;
+  validate.Result = Result;
+  t.validate = validate;
 
-module.exports = t;
+  return t;
+
+}));
+
 },{"tcomb":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/tcomb/index.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/AutoFocusMixin.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -25544,6 +25549,11 @@ module.exports = {
   function onFail(message) {
     // start debugger only once
     if (!failed) {
+      /*
+        DEBUG HINT:
+        if you are reading this, chances are that there is a bug in your system
+        see the Call Stack to find out what's wrong..
+      */
       /*jshint debug: true*/
       debugger; 
     }
@@ -25557,6 +25567,11 @@ module.exports = {
   };
 
   function fail(message) {
+    /*
+      DEBUG HINT:
+      if you are reading this, chances are that there is a bug in your system
+      see the Call Stack to find out what's wrong..
+    */
     options.onFail(message);
   }
   
@@ -25564,6 +25579,11 @@ module.exports = {
     if (guard !== true) {
       var args = slice.call(arguments, 1);
       var message = args[0] ? format.apply(null, args) : 'assert failed';
+      /*
+        DEBUG HINT:
+        if you are reading this, chances are that there is a bug in your system
+        see the Call Stack to find out what's wrong..
+      */
       fail(message); 
     }
   }
@@ -25574,14 +25594,10 @@ module.exports = {
   
   var slice = Array.prototype.slice;
   
-  var errs = {
-    ERR_BAD_TYPE_VALUE: 'Invalid type argument `value` of value `%j` supplied to `%s`, expected %s.',
-    ERR_BAD_COMBINATOR_ARGUMENT: 'Invalid combinator argument `%s` of value `%j` supplied to `%s`, expected %s.',
-    ERR_OPTIONS_UPDATE_MISSING: 'Missing `options.update` implementation',
-    ERR_NEW_OPERATOR_FORBIDDEN: 'Operator `new` is forbidden for `%s`'
-  };
-  
   function mixin(target, source, overwrite) {
+    if (Nil.is(source)) {
+      return target;
+    }
     for (var k in source) {
       if (source.hasOwnProperty(k)) {
         if (!overwrite) {
@@ -25591,6 +25607,12 @@ module.exports = {
       }
     }
     return target;
+  }
+
+  function merge() {
+    return Array.prototype.reduce.call(arguments, function (x, y) {
+      return mixin(x, y, true);
+    }, {});
   }
   
   function format() {
@@ -25630,13 +25652,15 @@ module.exports = {
     return Func.is(type) && Obj.is(type.meta);
   }
   
-  function areTypes(types) {
-    return Arr.is(types) && types.every(isType);
-  }
-  
   function getName(type) {
     assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `getName()`, expected a type.', type);
     return type.meta.name;
+  }
+
+  function deprecated(message) {
+    if (console && console.warn) {
+      console.warn(message);
+    }
   }
 
   function getKind(type) {
@@ -25645,38 +25669,18 @@ module.exports = {
   }
 
   function isKind(type, kind) {
+    deprecated('`isKind(type, kind)` is deprecated, use `getKind(type) === kind` instead');
     return getKind(type) === kind;
   }
-  
-  function values(obj) {
-    var ret = [];
-    for (var k in obj) {
-      if (obj.hasOwnProperty(k)) {
-        ret.push(obj[k]);
-      }
-    }
-    return ret;
-  }
 
-  function ensureName(name, defaultName, types) {
-    if (Nil.is(name)) {
-      if (areTypes(types)) {
-        return format(types.length > 1 ? '%s([%s])' : '%s(%s)', defaultName, types.map(getName).join(', '));
-      }
-      return defaultName;
-    }
-    assert(Str.is(name), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'name', name, defaultName, 'a `maybe(Str)`');
-    return name;
-  }
-  
-  // since in tcomb the only real constructors are those provided
-  // by `struct`, the `new` operator is forbidden for all types
-  function forbidNewOperator(x, T) {
-    assert(!(x instanceof T), errs.ERR_NEW_OPERATOR_FORBIDDEN, getName(T));
+  function blockNew(x, type) {
+    // DEBUG HINT: since in tcomb the only real constructors are those provided
+    // by `struct`, the `new` operator is forbidden for all types
+    assert(!(x instanceof type), 'Operator `new` is forbidden for `%s`', getName(type));
   }
   
   function update() {
-    assert(Func.is(options.update), errs.ERR_OPTIONS_UPDATE_MISSING);
+    assert(Func.is(options.update), 'Missing `options.update` implementation');
     /*jshint validthis:true*/
     var T = this;
     var value = options.update.apply(T, arguments);
@@ -25689,10 +25693,21 @@ module.exports = {
   
   function irriducible(name, is) {
   
+    // DEBUG HINT: if the debugger stops here, the first argument is not a string
+    assert(typeof name === 'string', 'Invalid argument `name` supplied to `irriducible()`');
+
+    // DEBUG HINT: if the debugger stops here, the second argument is not a function
+    assert(typeof is === 'function', 'Invalid argument `is` supplied to `irriducible()`');
+
     function Irriducible(value) {
-      forbidNewOperator(this, Irriducible);
-      assert(is(value), errs.ERR_BAD_TYPE_VALUE, value, name, format('a `%s`', name));
-      // all primitives types are idempotent
+
+      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
+      blockNew(this, Irriducible);
+
+      // DEBUG HINT: if the debugger stops here, the first argument is invalid
+      // mouse over the `value` variable to see what's wrong. In `name` there is the name of the type
+      assert(is(value), 'Invalid `%s` supplied to `%s`', value, name);
+      
       return value;
     }
   
@@ -25749,13 +25764,21 @@ module.exports = {
   var Dat = irriducible('Dat', function (x) {
     return x instanceof Date;
   });
+
+  var Type = irriducible('Type', isType);
   
   function struct(props, name) {
   
-    // check combinator args
-    name = ensureName(name, 'struct');
-    assert(Obj.is(props), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'props', props, name, 'an `Obj`');
-    assert(values(props).every(isType), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'props', props, name, 'a dict of types');
+    // DEBUG HINT: if the debugger stops here, the first argument is not a dict of types
+    // mouse over the `props` variable to see what's wrong
+    assert(dict(Type).is(props), 'Invalid argument `props` supplied to `struct()`');
+
+    // DEBUG HINT: if the debugger stops here, the second argument is not a string
+    // mouse over the `name` variable to see what's wrong
+    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `struct()`');
+
+    // DEBUG HINT: always give a name to a type, the debug will be easier
+    name = name || 'struct';
   
     function Struct(value, mut) {
   
@@ -25764,7 +25787,9 @@ module.exports = {
         return value;
       }
   
-      assert(Obj.is(value), errs.ERR_BAD_TYPE_VALUE, value, name, 'an `Obj`');
+      // DEBUG HINT: if the debugger stops here, the first argument is invalid
+      // mouse over the `value` variable to see what's wrong. In `name` there is the name of the type
+      assert(Obj.is(value), 'Invalid `%s` supplied to `%s`, expected an `Obj`', value, name);
   
       // makes `new` optional
       if (!(this instanceof Struct)) { 
@@ -25773,7 +25798,11 @@ module.exports = {
       
       for (var k in props) {
         if (props.hasOwnProperty(k)) {
-          this[k] = props[k](value[k], mut);
+          var expected = props[k];
+          var actual = value[k];
+          // DEBUG HINT: if the debugger stops here, the `actual` value supplied to the `expected` type is invalid
+          // mouse over the `actual` and `expected` variables to see what's wrong
+          this[k] = expected(actual, mut);
         }
       }
   
@@ -25799,18 +25828,36 @@ module.exports = {
 
   function union(types, name) {
   
-    // check combinator args
-    var combinator = 'union';
-    name = ensureName(name, combinator, types);
-    assert(areTypes(types) && types.length >= 2, errs.ERR_BAD_COMBINATOR_ARGUMENT, 'types', types, combinator, 'a list(type) of length >= 2');
-  
+    // DEBUG HINT: if the debugger stops here, the first argument is not a list of types
+    assert(list(Type).is(types), 'Invalid argument `types` supplied to `union()`');
+
+    var len = types.length;
+
+    // DEBUG HINT: if the debugger stops here, there are too few types (they must be at least two)
+    assert(len >= 2, 'Invalid argument `types` supplied to `union()`');
+
+    // DEBUG HINT: if the debugger stops here, the second argument is not a string
+    // mouse over the `name` variable to see what's wrong
+    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `union()`');
+
+    name = name || format('union([%s])', types.map(getName).join(', '));
+
     function Union(value, mut) {
-      forbidNewOperator(this, Union);
+
+      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
+      blockNew(this, Union);
+      
+      // DEBUG HINT: if the debugger stops here, you must implement the `dispatch` static method for this type
       assert(Func.is(Union.dispatch), 'unimplemented %s.dispatch()', name);
-      var T = Union.dispatch(value);
-      assert(isType(T), '%s.dispatch() returns no type', name);
-      // a union type is idempotent iif every T in types is idempotent
-      return T(value, mut);
+
+      var type = Union.dispatch(value);
+
+      // DEBUG HINT: if the debugger stops here, the `dispatch` static method returns no type
+      assert(isType(type), '%s.dispatch() returns no type', name);
+      
+      // DEBUG HINT: if the debugger stops here, `value` can't be converted to `type`
+      // mouse over the `value` and `type` variables to see what's wrong
+      return type(value, mut);
     }
   
     Union.meta = {
@@ -25820,8 +25867,8 @@ module.exports = {
     };
   
     Union.is = function (x) {
-      return types.some(function (T) {
-        return T.is(x);
+      return types.some(function (type) {
+        return type.is(x);
       });
     };
   
@@ -25839,19 +25886,27 @@ module.exports = {
 
   function maybe(type, name) {
   
-    // check combinator args
-    var combinator = 'maybe';
-    name = ensureName(name, combinator, [type]);
-    assert(isType(type), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'type', type, combinator, 'a type');
+    // DEBUG HINT: if the debugger stops here, the first argument is not a type
+    assert(isType(type), 'Invalid argument `type` supplied to `maybe()`');
   
     // makes the combinator idempotent
-    if (type.meta.kind === 'maybe') {
+    if (getKind(type) === 'maybe') {
       return type;
     }
+
+    // DEBUG HINT: if the debugger stops here, the second argument is not a string
+    // mouse over the `name` variable to see what's wrong
+    assert(Nil.is(name) || Str.is(name), 'Invalid argument `name` supplied to `maybe()`');
   
+    name = name || format('maybe(%s)', getName(type));
+
     function Maybe(value, mut) {
-      forbidNewOperator(this, Maybe);
-      // a maybe type is idempotent iif type is idempotent
+
+      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
+      blockNew(this, Maybe);
+      
+      // DEBUG HINT: if the debugger stops here, `value` can't be converted to `type`
+      // mouse over the `value` and `type` variables to see what's wrong
       return Nil.is(value) ? null : type(value, mut);
     }
   
@@ -25870,17 +25925,28 @@ module.exports = {
 
   function enums(map, name) {
   
-    // check combinator args
-    name = ensureName(name, 'enums');
-    assert(Obj.is(map), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'map', map, name, 'an `Obj`');
+    // DEBUG HINT: if the debugger stops here, the first argument is not a hash
+    // mouse over the `map` variable to see what's wrong
+    assert(Obj.is(map), 'Invalid argument `map` supplied to `enums()`');
   
-    // cache expected value
-    var expected = 'a valid enum';
+    // DEBUG HINT: if the debugger stops here, the second argument is not a string
+    // mouse over the `name` variable to see what's wrong
+    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `enums()`');
+
+    name = name || 'enums';
+
+    // cache enums
+    var keys = Object.keys(map);
   
     function Enums(value) {
-      forbidNewOperator(this, Enums);
-      assert(Enums.is(value), errs.ERR_BAD_TYPE_VALUE, value, name, expected);
-      // all enums types are idempotent
+
+      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
+      blockNew(this, Enums);
+
+      // DEBUG HINT: if the debugger stops here, the value is not one of the defined enums
+      // mouse over the `value`, `name` and `keys` variables to see what's wrong
+      assert(Enums.is(value), 'Invalid `%s` supplied to `%s`, expected one of %j', value, name, keys);
+      
       return value;
     }
   
@@ -25907,21 +25973,29 @@ module.exports = {
   };
 
   function tuple(types, name) {
-  
-    // check combinator args
-    var combinator = 'tuple';
-    name = ensureName(name, combinator, types);
-    assert(areTypes(types) && types.length >= 2, errs.ERR_BAD_COMBINATOR_ARGUMENT, 'types', types, combinator, 'a list(type) of length >= 2');
-  
-    // cache types length
+
+    // DEBUG HINT: if the debugger stops here, the first argument is not a list of types
+    assert(list(Type).is(types), 'Invalid argument `types` supplied to `tuple()`');
+
     var len = types.length;
-    // cache expected value
-    var expected = format('a tuple `(%s)`', types.map(getName).join(', '));
+
+    // DEBUG HINT: if the debugger stops here, there are too few types (they must be at least two)
+    assert(len >= 2, 'Invalid argument `types` supplied to `tuple()`');
+
+    // DEBUG HINT: if the debugger stops here, the second argument is not a string
+    // mouse over the `name` variable to see what's wrong
+    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `tuple()`');
+
+    name = name || format('tuple([%s])', types.map(getName).join(', '));
   
     function Tuple(value, mut) {
   
-      forbidNewOperator(this, Tuple);
-      assert(Arr.is(value) && value.length === len, errs.ERR_BAD_TYPE_VALUE, value, name, expected);
+      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
+      blockNew(this, Tuple);
+
+      // DEBUG HINT: if the debugger stops here, the value is not one of the defined enums
+      // mouse over the `value`, `name` and `len` variables to see what's wrong
+      assert(Arr.is(value) && value.length === len, 'Invalid `%s` supplied to `%s`, expected an `Arr` of length `%s`', value, name, len);
   
       // makes Tuple idempotent
       if (Tuple.isTuple(value)) {
@@ -25930,9 +26004,11 @@ module.exports = {
   
       var arr = [];
       for (var i = 0 ; i < len ; i++) {
-        var T = types[i];
-        var v = value[i];
-        arr.push(T.is(v) ? v : T(v, mut));
+        var expected = types[i];
+        var actual = value[i];
+        // DEBUG HINT: if the debugger stops here, the `actual` value supplied to the `expected` type is invalid
+        // mouse over the `actual` and `expected` variables to see what's wrong
+        arr.push(expected(actual, mut));
       }
   
       if (!mut) { 
@@ -25964,20 +26040,33 @@ module.exports = {
 
   function subtype(type, predicate, name) {
   
-    // check combinator args
-    var combinator = 'subtype';
-    name = ensureName(name, combinator, [type]);
-    assert(isType(type), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'type', type, combinator, 'a type');
-    assert(Func.is(predicate), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'predicate', predicate, combinator, 'a `Func`');
+    // DEBUG HINT: if the debugger stops here, the first argument is not a type
+    assert(isType(type), 'Invalid argument `type` supplied to `subtype()`');
+    
+    // DEBUG HINT: if the debugger stops here, the second argument is not a function
+    assert(Func.is(predicate), 'Invalid argument `predicate` supplied to `subtype()`');
   
+    // DEBUG HINT: if the debugger stops here, the third argument is not a string
+    // mouse over the `name` variable to see what's wrong
+    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `subtype()`');
+
+    // DEBUG HINT: always give a name to a type, the debug will be easier
+    name = name || format('subtype(%s)', getName(type));
+
     // cache expected value
-    var expected = predicate.__doc__ || 'a valid value for the predicate';
+    var expected = predicate.__doc__ || format('insert a valid value for %s', predicate.name || 'the subtype');
   
     function Subtype(value, mut) {
-      forbidNewOperator(this, Subtype);
-      // a subtype type is idempotent iif T is idempotent
+
+      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
+      blockNew(this, Subtype);
+      
+      // DEBUG HINT: if the debugger stops here, the value cannot be converted to the base type
       var x = type(value, mut);
-      assert(predicate(x), errs.ERR_BAD_TYPE_VALUE, value, name, expected);
+      
+      // DEBUG HINT: if the debugger stops here, the value is converted to the base type
+      // but the predicate returns `false`
+      assert(predicate(x), 'Invalid `%s` supplied to `%s`, %s', value, name, expected);
       return x;
     }
   
@@ -25992,30 +26081,29 @@ module.exports = {
       return type.is(x) && predicate(x);
     };
   
-    /* fix #22
-    if (type.meta.kind === 'struct') {
-      // keep a reference to prototype to easily define new methods and attach them to supertype
-      Subtype.prototype = type.prototype;
-    }
-    */
-  
     return Subtype;
   }
 
   function list(type, name) {
   
-    // check combinator args
-    var combinator = 'list';
-    name = ensureName(name, combinator, [type]);
-    assert(isType(type), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'type', type, combinator, 'a type');
+    // DEBUG HINT: if the debugger stops here, the first argument is not a type
+    assert(isType(type), 'Invalid argument `type` supplied to `list()`');
   
-    // cache expected value
-    var expected = format('a list of `%s`', getName(type));
-  
+    // DEBUG HINT: if the debugger stops here, the third argument is not a string
+    // mouse over the `name` variable to see what's wrong
+    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `list()`');
+
+    // DEBUG HINT: always give a name to a type, the debug will be easier
+    name = name || format('list(%s)', getName(type));
+
     function List(value, mut) {
   
-      forbidNewOperator(this, List);
-      assert(Arr.is(value), errs.ERR_BAD_TYPE_VALUE, value, name, expected);
+      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
+      blockNew(this, List);
+
+      // DEBUG HINT: if the debugger stops here, the value is not one of the defined enums
+      // mouse over the `value` and `name` variables to see what's wrong
+      assert(Arr.is(value), 'Invalid `%s` supplied to `%s`, expected an `Arr`', value, name);
   
       // makes List idempotent
       if (List.isList(value)) {
@@ -26024,8 +26112,10 @@ module.exports = {
   
       var arr = [];
       for (var i = 0, len = value.length ; i < len ; i++ ) {
-        var v = value[i];
-        arr.push(type(v, mut));
+        var actual = value[i];
+        // DEBUG HINT: if the debugger stops here, the `actual` value supplied to the `type` type is invalid
+        // mouse over the `actual` and `type` variables to see what's wrong
+        arr.push(type(actual, mut));
       }
   
       if (!mut) { 
@@ -26056,18 +26146,24 @@ module.exports = {
 
   function dict(type, name) {
   
-    // check combinator args
-    var combinator = 'dict';
-    name = ensureName(name, combinator, [type]);
-    assert(isType(type), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'type', type, combinator, 'a type');
-
-    // cache expected value
-    var expected = format('a dict of `%s`', getName(type));
+    // DEBUG HINT: if the debugger stops here, the first argument is not a type
+    assert(isType(type), 'Invalid argument `type` supplied to `dict()`');
   
+    // DEBUG HINT: if the debugger stops here, the third argument is not a string
+    // mouse over the `name` variable to see what's wrong
+    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `dict()`');
+
+    // DEBUG HINT: always give a name to a type, the debug will be easier
+    name = name || format('dict(%s)', getName(type));
+
     function Dict(value, mut) {
   
-      forbidNewOperator(this, Dict);
-      assert(Obj.is(value), errs.ERR_BAD_TYPE_VALUE, value, name, expected);
+      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
+      blockNew(this, Dict);
+
+      // DEBUG HINT: if the debugger stops here, the value is not one of the defined enums
+      // mouse over the `value` and `name` variables to see what's wrong
+      assert(Obj.is(value), 'Invalid `%s` supplied to `%s`, expected an `Obj`', value, name);
   
       // makes Dict idempotent
       if (Dict.isDict(value)) {
@@ -26077,7 +26173,10 @@ module.exports = {
       var obj = {};
       for (var k in value) {
         if (value.hasOwnProperty(k)) {
-          obj[k] = type(value[k], mut);
+          var actual = value[k];
+          // DEBUG HINT: if the debugger stops here, the `actual` value supplied to the `type` type is invalid
+          // mouse over the `actual` and `type` variables to see what's wrong
+          obj[k] = type(actual, mut);
         }
       }
   
@@ -26116,9 +26215,22 @@ module.exports = {
   
     name = name || 'func()';
     Arguments = Arr.is(Arguments) ? tuple(Arguments, 'Arguments') : Arguments;
-    assert(isType(Arguments), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'Arguments', Arguments, name, 'a type or a list of types');
-    assert(Func.is(f), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'f', f, name, 'a `Func`');
-    assert(Nil.is(Return) || isType(Return), errs.ERR_BAD_COMBINATOR_ARGUMENT, 'Return', Return, name, 'a type');
+
+    // DEBUG HINT: if the debugger stops here, the first argument is not a type
+    assert(isType(Arguments), 'Invalid argument `Arguments` supplied to `func()`');
+
+    // DEBUG HINT: if the debugger stops here, the second argument is not a function
+    assert(Func.is(f), 'Invalid argument `f` supplied to `func()`');
+
+    // DEBUG HINT: if the debugger stops here, the third argument is not a type (or Nil)
+    assert(Nil.is(Return) || isType(Return), 'Invalid argument `Return` supplied to `func()`');
+
+    // DEBUG HINT: if the debugger stops here, the third argument is not a string
+    // mouse over the `name` variable to see what's wrong
+    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `func()`');
+
+    // DEBUG HINT: always give a name to a type, the debug will be easier
+    name = name || f.name || 'func';
   
     // makes the combinator idempotent
     Return = Return || null;
@@ -26135,12 +26247,17 @@ module.exports = {
         args.length = f.length; 
       }
   
-      args = Arguments.is(args) ? args : Arguments(args);
+      // DEBUG HINT: if the debugger stops here, the arguments of the function are invalid
+      // mouse over the `args` variable to see what's wrong
+      args = Arguments(args);
   
-      var r = f.apply(null, args);
+      /*jshint validthis: true */
+      var r = f.apply(this, args);
   
       if (Return) {
-        r = Return.is(r) ? r : Return(r);
+        // DEBUG HINT: if the debugger stops here, the return value of the function is invalid
+        // mouse over the `r` variable to see what's wrong
+        r = Return(r);
       }
   
       return r;
@@ -26161,16 +26278,43 @@ module.exports = {
     return fn;
   }
 
+  function alias(type, name) {
+
+    // DEBUG HINT: if the debugger stops here, the first argument is not a type
+    assert(isType(type), 'Invalid argument `type` supplied to `alias()`');
+  
+    // DEBUG HINT: if the debugger stops here, the third argument is not a string
+    // mouse over the `name` variable to see what's wrong
+    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `alias()`');
+
+    // DEBUG HINT: always give a name to a type, the debug will be easier
+    name = name || 'alias(' + getName(type) + ')';
+
+    function Alias(value, mut) {
+      return type(value, mut);
+    }
+
+    Alias.is = function (x) {
+      return type.is(x);
+    };
+
+    Alias.meta = type.meta;
+    Alias.name = name;
+
+    return Alias;
+
+  }
+
   return {
 
     util: {
       mixin: mixin,
+      merge: merge,
       format: format,
       isType: isType,
       getName: getName,
       getKind: getKind,
       isKind: isKind,
-      values: values,
       slice: slice
     },
 
@@ -26189,6 +26333,7 @@ module.exports = {
     Err: Err,
     Re: Re,
     Dat: Dat,
+    Type: Type,
 
     irriducible: irriducible,
     struct: struct,
@@ -26199,7 +26344,8 @@ module.exports = {
     subtype: subtype,
     list: list,
     dict: dict,
-    func: func
+    func: func,
+    alias: alias
   };
 }));
 
@@ -26278,7 +26424,7 @@ $(function () {
 var t = require('../index');
 var React = require('react');
 var bs = require('tcomb-react-bootstrap');
-var v = t.addons.validation.validate;
+var v = t.validate;
 
 //
 // import all bootstrap components

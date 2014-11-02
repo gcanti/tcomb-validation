@@ -7,7 +7,7 @@ $(function () {
 var t = require('../index');
 var React = require('react');
 var bs = require('tcomb-react-bootstrap');
-var v = t.addons.validation.validate;
+var v = t.validate;
 
 //
 // import all bootstrap components
