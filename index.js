@@ -22,7 +22,7 @@
   var maybe = t.maybe;
   var list = t.list;
 
-  var isType = t.util.isType;
+  var Type = t.Type;
   var assert = t.assert;
   var getName = t.util.getName;
   var mixin = t.util.mixin;
@@ -133,7 +133,7 @@
   }
 
   function validateMaybe(value, type, opts) {
-    assert(isType(type) && type.meta.kind === 'maybe');
+    assert(Type.is(type) && type.meta.kind === 'maybe');
 
     if (!Nil.is(value)) {
       return _validate(value, type.meta.type, opts);
@@ -241,7 +241,14 @@
     var errors = [];
     for (var k in value) {
       if (value.hasOwnProperty(k)) {
-        var result = _validate(value[k], type.meta.type, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':type')});
+        // domain
+        var result = _validate(k, type.meta.domain, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':domain')});
+        if (!result.isValid()) {
+          isValid = false;
+          errors = errors.concat(result.errors);
+        }        
+        // codomain
+        result = _validate(value[k], type.meta.codomain, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':codomain')});
         if (!result.isValid()) {
           isValid = false;
           errors = errors.concat(result.errors);
@@ -283,7 +290,7 @@
 
   function validate(value, type, opts) {
     opts = opts || {};
-    assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `validate`, expected a type', type);
+    assert(Type.is(type), 'Invalid argument `type` of value `%j` supplied to `validate`, expected a type', type);
     assert(maybe(Arr).is(opts.path), 'Invalid argument `opts.path` of value `%j` supplied to `validate`, expected an `Arr`', opts.path);
 
     opts.path = opts.path || [];

@@ -23,7 +23,7 @@
   var maybe = t.maybe;
   var list = t.list;
 
-  var isType = t.util.isType;
+  var Type = t.Type;
   var assert = t.assert;
   var getName = t.util.getName;
   var mixin = t.util.mixin;
@@ -134,7 +134,7 @@
   }
 
   function validateMaybe(value, type, opts) {
-    assert(isType(type) && type.meta.kind === 'maybe');
+    assert(Type.is(type) && type.meta.kind === 'maybe');
 
     if (!Nil.is(value)) {
       return _validate(value, type.meta.type, opts);
@@ -242,7 +242,14 @@
     var errors = [];
     for (var k in value) {
       if (value.hasOwnProperty(k)) {
-        var result = _validate(value[k], type.meta.type, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':type')});
+        // domain
+        var result = _validate(k, type.meta.domain, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':domain')});
+        if (!result.isValid()) {
+          isValid = false;
+          errors = errors.concat(result.errors);
+        }        
+        // codomain
+        result = _validate(value[k], type.meta.codomain, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':codomain')});
         if (!result.isValid()) {
           isValid = false;
           errors = errors.concat(result.errors);
@@ -284,7 +291,7 @@
 
   function validate(value, type, opts) {
     opts = opts || {};
-    assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `validate`, expected a type', type);
+    assert(Type.is(type), 'Invalid argument `type` of value `%j` supplied to `validate`, expected a type', type);
     assert(maybe(Arr).is(opts.path), 'Invalid argument `opts.path` of value `%j` supplied to `validate`, expected an `Arr`', opts.path);
 
     opts.path = opts.path || [];
@@ -25560,10 +25567,9 @@ module.exports = {
     failed = true;
     throw new Error(message);
   }
-  
+
   var options = {
-    onFail: onFail,
-    update: null
+    onFail: onFail
   };
 
   function fail(message) {
@@ -25610,7 +25616,7 @@ module.exports = {
   }
 
   function merge() {
-    return Array.prototype.reduce.call(arguments, function (x, y) {
+    return Array.prototype.reduce.call(arguments, function reducer(x, y) {
       return mixin(x, y, true);
     }, {});
   }
@@ -25648,44 +25654,86 @@ module.exports = {
     j: function (x) { return JSON.stringify(x, replacer); }
   };
   
-  function isType(type) {
-    return Func.is(type) && Obj.is(type.meta);
-  }
-  
   function getName(type) {
-    assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `getName()`, expected a type.', type);
+    assert(Type.is(type), 'Invalid argument `type` of value `%j` supplied to `getName()`, expected a type.', type);
     return type.meta.name;
   }
 
-  function deprecated(message) {
-    if (console && console.warn) {
-      console.warn(message);
-    }
-  }
-
   function getKind(type) {
-    assert(isType(type), 'Invalid argument `type` of value `%j` supplied to `geKind()`, expected a type.', type);
+    assert(Type.is(type), 'Invalid argument `type` of value `%j` supplied to `geKind()`, expected a type.', type);
     return type.meta.kind;
   }
 
-  function isKind(type, kind) {
-    deprecated('`isKind(type, kind)` is deprecated, use `getKind(type) === kind` instead');
-    return getKind(type) === kind;
-  }
-
   function blockNew(x, type) {
-    // DEBUG HINT: since in tcomb the only real constructors are those provided
-    // by `struct`, the `new` operator is forbidden for all types
     assert(!(x instanceof type), 'Operator `new` is forbidden for `%s`', getName(type));
   }
-  
-  function update() {
-    assert(Func.is(options.update), 'Missing `options.update` implementation');
-    /*jshint validthis:true*/
-    var T = this;
-    var value = options.update.apply(T, arguments);
-    return T(value);
+
+  function shallowCopy(x) {
+    return Arr.is(x) ? x.concat() : Obj.is(x) ? mixin({}, x) : x;
   }
+
+  function update(instance, spec) {
+    assert(!Nil.is(instance));
+    assert(Obj.is(spec));
+    var value = shallowCopy(instance);
+    for (var k in spec) {
+      if (spec.hasOwnProperty(k)) {
+        if (update.commands.hasOwnProperty(k)) {
+          assert(Object.keys(spec).length === 1);
+          return update.commands[k](spec[k], value);
+        } else {
+          value[k] = update(value[k], spec[k]);
+        }
+      }
+    }
+    return value;
+  }
+
+  update.commands = {
+    '$apply': function (f, value) {
+      assert(Func.is(f));
+      return f(value);
+    },
+    '$push': function (elements, arr) {
+      assert(Arr.is(elements));
+      assert(Arr.is(arr));
+      return arr.concat(elements);
+    },
+    '$remove': function (keys, obj) {
+      assert(Arr.is(keys));
+      assert(Obj.is(obj));
+      for (var i = 0, len = keys.length ; i < len ; i++ ) {
+        delete obj[keys[i]];
+      }
+      return obj;
+    },
+    '$set': function (value) {
+      return value;
+    },
+    '$splice': function (splices, arr) {
+      assert(list(Arr).is(splices));
+      assert(Arr.is(arr));
+      return splices.reduce(function (acc, splice) {
+        acc.splice.apply(acc, splice);
+        return acc;
+      }, arr);
+    },
+    '$swap': function (config, arr) {
+      assert(Obj.is(config));
+      assert(Num.is(config.from));
+      assert(Num.is(config.to));
+      assert(Arr.is(arr));
+      var element = arr[config.to];
+      arr[config.to] = arr[config.from];
+      arr[config.from] = element;
+      return arr;
+    },
+    '$unshift': function (elements, arr) {
+      assert(Arr.is(elements));
+      assert(Arr.is(arr));
+      return elements.concat(arr);
+    }
+  };
 
   //
   // irriducibles
@@ -25721,57 +25769,59 @@ module.exports = {
     return Irriducible;
   }
 
-  var Any = irriducible('Any', function () {
+  var Any = irriducible('Any', function isAny() {
     return true;
   });
   
-  var Nil = irriducible('Nil', function (x) {
-    return x === null || x === undefined;
+  var Nil = irriducible('Nil', function isNil(x) {
+    return x === null || x === void 0;
   });
   
-  var Str = irriducible('Str', function (x) {
+  var Str = irriducible('Str', function isStr(x) {
     return typeof x === 'string';
   });
   
-  var Num = irriducible('Num', function (x) {
+  var Num = irriducible('Num', function isNum(x) {
     return typeof x === 'number' && isFinite(x) && !isNaN(x);
   });
   
-  var Bool = irriducible('Bool', function (x) {
+  var Bool = irriducible('Bool', function isBool(x) {
     return x === true || x === false;
   });
   
-  var Arr = irriducible('Arr', function (x) {
+  var Arr = irriducible('Arr', function isArr(x) {
     return x instanceof Array;
   });
   
-  var Obj = irriducible('Obj', function (x) {
+  var Obj = irriducible('Obj', function isObj(x) {
     return !Nil.is(x) && typeof x === 'object' && !Arr.is(x);
   });
   
-  var Func = irriducible('Func', function (x) {
+  var Func = irriducible('Func', function isFunc(x) {
     return typeof x === 'function';
   });
   
-  var Err = irriducible('Err', function (x) {
+  var Err = irriducible('Err', function isErr(x) {
     return x instanceof Error;
   });
   
-  var Re = irriducible('Re', function (x) {
+  var Re = irriducible('Re', function isRe(x) {
     return x instanceof RegExp;
   });
   
-  var Dat = irriducible('Dat', function (x) {
+  var Dat = irriducible('Dat', function isDat(x) {
     return x instanceof Date;
   });
 
-  var Type = irriducible('Type', isType);
+  var Type = irriducible('Type', function isType(x) {
+    return Func.is(x) && Obj.is(x.meta);
+  });
   
   function struct(props, name) {
   
     // DEBUG HINT: if the debugger stops here, the first argument is not a dict of types
     // mouse over the `props` variable to see what's wrong
-    assert(dict(Type).is(props), 'Invalid argument `props` supplied to `struct()`');
+    assert(dict(Str, Type).is(props), 'Invalid argument `props` supplied to `struct()`');
 
     // DEBUG HINT: if the debugger stops here, the second argument is not a string
     // mouse over the `name` variable to see what's wrong
@@ -25806,7 +25856,7 @@ module.exports = {
         }
       }
   
-      if (!mut) { 
+      if (mut !== true) { 
         Object.freeze(this); 
       }
     }
@@ -25817,12 +25867,18 @@ module.exports = {
       name: name
     };
   
-    Struct.is = function (x) { 
+    Struct.is = function isStruct(x) { 
       return x instanceof Struct; 
     };
   
-    Struct.update = update;
+    Struct.update = function updateStruct(instance, spec, value) {
+      return new Struct(update(instance, spec, value));
+    };
   
+    Struct.extend = function extendStruct(newProps, name) {
+      return struct([props].concat(newProps).reduce(mixin, {}), name);
+    };
+
     return Struct;
   }
 
@@ -25853,7 +25909,7 @@ module.exports = {
       var type = Union.dispatch(value);
 
       // DEBUG HINT: if the debugger stops here, the `dispatch` static method returns no type
-      assert(isType(type), '%s.dispatch() returns no type', name);
+      assert(Type.is(type), '%s.dispatch() returns no type', name);
       
       // DEBUG HINT: if the debugger stops here, `value` can't be converted to `type`
       // mouse over the `value` and `type` variables to see what's wrong
@@ -25866,14 +25922,14 @@ module.exports = {
       name: name
     };
   
-    Union.is = function (x) {
-      return types.some(function (type) {
+    Union.is = function isUnion(x) {
+      return types.some(function isType(type) {
         return type.is(x);
       });
     };
   
     // default dispatch implementation
-    Union.dispatch = function (x) {
+    Union.dispatch = function dispatch(x) {
       for (var i = 0, len = types.length ; i < len ; i++ ) {
         if (types[i].is(x)) {
           return types[i];
@@ -25887,7 +25943,7 @@ module.exports = {
   function maybe(type, name) {
   
     // DEBUG HINT: if the debugger stops here, the first argument is not a type
-    assert(isType(type), 'Invalid argument `type` supplied to `maybe()`');
+    assert(Type.is(type), 'Invalid argument `type` supplied to `maybe()`');
   
     // makes the combinator idempotent
     if (getKind(type) === 'maybe') {
@@ -25916,7 +25972,7 @@ module.exports = {
       name: name
     };
   
-    Maybe.is = function (x) {
+    Maybe.is = function isMaybe(x) {
       return Nil.is(x) || type.is(x);
     };
   
@@ -25956,14 +26012,14 @@ module.exports = {
       name: name
     };
   
-    Enums.is = function (x) {
+    Enums.is = function isEnums(x) {
       return Str.is(x) && map.hasOwnProperty(x);
     };
   
     return Enums;
   }
   
-  enums.of = function (keys, name) {
+  enums.of = function enumsOf(keys, name) {
     keys = Str.is(keys) ? keys.split(' ') : keys;
     var value = {};
     keys.forEach(function (k) {
@@ -25979,9 +26035,6 @@ module.exports = {
 
     var len = types.length;
 
-    // DEBUG HINT: if the debugger stops here, there are too few types (they must be at least two)
-    assert(len >= 2, 'Invalid argument `types` supplied to `tuple()`');
-
     // DEBUG HINT: if the debugger stops here, the second argument is not a string
     // mouse over the `name` variable to see what's wrong
     assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `tuple()`');
@@ -25990,9 +26043,6 @@ module.exports = {
   
     function Tuple(value, mut) {
   
-      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
-      blockNew(this, Tuple);
-
       // DEBUG HINT: if the debugger stops here, the value is not one of the defined enums
       // mouse over the `value`, `name` and `len` variables to see what's wrong
       assert(Arr.is(value) && value.length === len, 'Invalid `%s` supplied to `%s`, expected an `Arr` of length `%s`', value, name, len);
@@ -26011,7 +26061,7 @@ module.exports = {
         arr.push(expected(actual, mut));
       }
   
-      if (!mut) { 
+      if (mut !== true) { 
         Object.freeze(arr); 
       }
       return arr;
@@ -26020,6 +26070,7 @@ module.exports = {
     Tuple.meta = {
       kind: 'tuple',
       types: types,
+      length: len,
       name: name
     };
   
@@ -26029,11 +26080,13 @@ module.exports = {
       });
     };
   
-    Tuple.is = function (x) {
+    Tuple.is = function isTuple(x) {
       return Arr.is(x) && x.length === len && Tuple.isTuple(x);
     };
   
-    Tuple.update = update;
+    Tuple.update = function updateTuple(instance, spec, value) {
+      return Tuple(update(instance, spec, value));
+    };
   
     return Tuple;
   }
@@ -26041,7 +26094,7 @@ module.exports = {
   function subtype(type, predicate, name) {
   
     // DEBUG HINT: if the debugger stops here, the first argument is not a type
-    assert(isType(type), 'Invalid argument `type` supplied to `subtype()`');
+    assert(Type.is(type), 'Invalid argument `type` supplied to `subtype()`');
     
     // DEBUG HINT: if the debugger stops here, the second argument is not a function
     assert(Func.is(predicate), 'Invalid argument `predicate` supplied to `subtype()`');
@@ -26077,17 +26130,21 @@ module.exports = {
       name: name
     };
   
-    Subtype.is = function (x) {
+    Subtype.is = function isSubtype(x) {
       return type.is(x) && predicate(x);
     };
   
+    Subtype.update = function updateSubtype(instance, spec, value) {
+      return Subtype(update(instance, spec, value));
+    };
+
     return Subtype;
   }
 
   function list(type, name) {
   
     // DEBUG HINT: if the debugger stops here, the first argument is not a type
-    assert(isType(type), 'Invalid argument `type` supplied to `list()`');
+    assert(Type.is(type), 'Invalid argument `type` supplied to `list()`');
   
     // DEBUG HINT: if the debugger stops here, the third argument is not a string
     // mouse over the `name` variable to see what's wrong
@@ -26099,7 +26156,6 @@ module.exports = {
     function List(value, mut) {
   
       // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
-      blockNew(this, List);
 
       // DEBUG HINT: if the debugger stops here, the value is not one of the defined enums
       // mouse over the `value` and `name` variables to see what's wrong
@@ -26118,7 +26174,7 @@ module.exports = {
         arr.push(type(actual, mut));
       }
   
-      if (!mut) { 
+      if (mut !== true) { 
         Object.freeze(arr); 
       }
       return arr;
@@ -26134,34 +26190,35 @@ module.exports = {
       return x.every(type.is);
     };
   
-    List.is = function (x) {
+    List.is = function isList(x) {
       return Arr.is(x) && List.isList(x);
     };
   
-  
-    List.update = update;
+    List.update = function updateList(instance, spec, value) {
+      return List(update(instance, spec, value));
+    };
   
     return List;
   }
 
-  function dict(type, name) {
+  function dict(domain, codomain, name) {
   
     // DEBUG HINT: if the debugger stops here, the first argument is not a type
-    assert(isType(type), 'Invalid argument `type` supplied to `dict()`');
+    assert(Type.is(domain), 'Invalid argument `domain` supplied to `dict()`');
+
+    // DEBUG HINT: if the debugger stops here, the second argument is not a type
+    assert(Type.is(codomain), 'Invalid argument `codomain` supplied to `dict()`');
   
     // DEBUG HINT: if the debugger stops here, the third argument is not a string
     // mouse over the `name` variable to see what's wrong
     assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `dict()`');
 
     // DEBUG HINT: always give a name to a type, the debug will be easier
-    name = name || format('dict(%s)', getName(type));
+    name = name || format('dict(%s, %s)', getName(domain), getName(codomain));
 
     function Dict(value, mut) {
   
-      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
-      blockNew(this, Dict);
-
-      // DEBUG HINT: if the debugger stops here, the value is not one of the defined enums
+      // DEBUG HINT: if the debugger stops here, the value is not an object
       // mouse over the `value` and `name` variables to see what's wrong
       assert(Obj.is(value), 'Invalid `%s` supplied to `%s`, expected an `Obj`', value, name);
   
@@ -26173,14 +26230,17 @@ module.exports = {
       var obj = {};
       for (var k in value) {
         if (value.hasOwnProperty(k)) {
+          // DEBUG HINT: if the debugger stops here, the `k` value supplied to the `domain` type is invalid
+          // mouse over the `k` and `domain` variables to see what's wrong
+          k = domain(k);
           var actual = value[k];
-          // DEBUG HINT: if the debugger stops here, the `actual` value supplied to the `type` type is invalid
-          // mouse over the `actual` and `type` variables to see what's wrong
-          obj[k] = type(actual, mut);
+          // DEBUG HINT: if the debugger stops here, the `actual` value supplied to the `codomain` type is invalid
+          // mouse over the `actual` and `codomain` variables to see what's wrong
+          obj[k] = codomain(actual, mut);
         }
       }
   
-      if (!mut) { 
+      if (mut !== true) { 
         Object.freeze(obj); 
       }
       return obj;
@@ -26188,122 +26248,137 @@ module.exports = {
   
     Dict.meta = {
       kind: 'dict',
-      type: type,
+      domain: domain,
+      codomain: codomain,
       name: name
     };
   
     Dict.isDict = function (x) {
       for (var k in x) {
-        if (x.hasOwnProperty(k) && !type.is(x[k])) {
-          return false;
+        if (x.hasOwnProperty(k)) {
+          if (!domain.is(k) || !codomain.is(x[k])) { return false; }
         }
       }
       return true;
     };
   
-    Dict.is = function (x) {
+    Dict.is = function isDict(x) {
       return Obj.is(x) && Dict.isDict(x);
     };
   
   
-    Dict.update = update;
+    Dict.update = function updateDict(instance, spec, value) {
+      return Dict(update(instance, spec, value));
+    };
   
     return Dict;
   }
 
-  function func(Arguments, f, Return, name) {
-  
-    name = name || 'func()';
-    Arguments = Arr.is(Arguments) ? tuple(Arguments, 'Arguments') : Arguments;
+  function func(domain, codomain, name) {
 
-    // DEBUG HINT: if the debugger stops here, the first argument is not a type
-    assert(isType(Arguments), 'Invalid argument `Arguments` supplied to `func()`');
+    // handle handy syntax for unary functions
+    domain = Arr.is(domain) ? domain : [domain];
 
-    // DEBUG HINT: if the debugger stops here, the second argument is not a function
-    assert(Func.is(f), 'Invalid argument `f` supplied to `func()`');
+    // DEBUG HINT: if the debugger stops here, the first argument is not a list of types
+    assert(list(Type).is(domain), 'Invalid argument `domain` supplied to `func()`');
 
-    // DEBUG HINT: if the debugger stops here, the third argument is not a type (or Nil)
-    assert(Nil.is(Return) || isType(Return), 'Invalid argument `Return` supplied to `func()`');
-
-    // DEBUG HINT: if the debugger stops here, the third argument is not a string
-    // mouse over the `name` variable to see what's wrong
-    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `func()`');
+    // DEBUG HINT: if the debugger stops here, the second argument is not a type
+    assert(Type.is(codomain), 'Invalid argument `codomain` supplied to `func()`');
 
     // DEBUG HINT: always give a name to a type, the debug will be easier
-    name = name || f.name || 'func';
-  
-    // makes the combinator idempotent
-    Return = Return || null;
-    if (isType(f) && f.meta.Arguments === Arguments && f.meta.Return === Return) {
-      return f;
-    }
-  
-    function fn() {
-  
-      var args = slice.call(arguments);
-  
-      // handle optional arguments
-      if (args.length < f.length) {
-        args.length = f.length; 
+    name = name || format('func([%s], %s)', domain.map(getName).join(', '), getName(codomain));
+
+    // cache the domain length
+    var domainLen = domain.length;
+
+    function Func(value) {
+
+      // automatically instrument the function if is not already instrumented
+      if (!func.is(value)) {
+        value = Func.of(value);
       }
-  
-      // DEBUG HINT: if the debugger stops here, the arguments of the function are invalid
-      // mouse over the `args` variable to see what's wrong
-      args = Arguments(args);
-  
-      /*jshint validthis: true */
-      var r = f.apply(this, args);
-  
-      if (Return) {
-        // DEBUG HINT: if the debugger stops here, the return value of the function is invalid
-        // mouse over the `r` variable to see what's wrong
-        r = Return(r);
-      }
-  
-      return r;
+
+      // DEBUG HINT: if the debugger stops here, the first argument is invalid
+      // mouse over the `value` and `name` variables to see what's wrong
+      assert(Func.is(value), 'Invalid `%s` supplied to `%s`', value, name);
+      
+      return value;
     }
-  
-    fn.is = function (x) { 
-      return x === fn; 
-    };
-  
-    fn.meta = {
+
+    Func.meta = {
       kind: 'func',
-      Arguments: Arguments,
-      f: f,
-      Return: Return,
+      domain: domain,
+      codomain: codomain,
       name: name
     };
-  
-    return fn;
-  }
 
-  function alias(type, name) {
-
-    // DEBUG HINT: if the debugger stops here, the first argument is not a type
-    assert(isType(type), 'Invalid argument `type` supplied to `alias()`');
-  
-    // DEBUG HINT: if the debugger stops here, the third argument is not a string
-    // mouse over the `name` variable to see what's wrong
-    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `alias()`');
-
-    // DEBUG HINT: always give a name to a type, the debug will be easier
-    name = name || 'alias(' + getName(type) + ')';
-
-    function Alias(value, mut) {
-      return type(value, mut);
-    }
-
-    Alias.is = function (x) {
-      return type.is(x);
+    Func.is = function isFunc(x) {
+      return func.is(x) && 
+        x.func.domain.length === domain.length && 
+        x.func.domain.every(function (type, i) {
+          return type === domain[i];
+        }) && 
+        x.func.codomain === codomain; 
     };
 
-    Alias.meta = type.meta;
-    Alias.name = name;
+    Func.of = function funcOf(f) {
 
-    return Alias;
+      // DEBUG HINT: if the debugger stops here, f is not a function
+      assert(typeof f === 'function');
+
+      // makes Func.of idempotent
+      if (Func.is(f)) {
+        return f;
+      }
+
+      function fn() {
+    
+        var args = slice.call(arguments);
+        var len = Math.min(args.length, domainLen);
+        
+        // DEBUG HINT: if the debugger stops here, you provided wrong arguments to the function
+        // mouse over the `args` variable to see what's wrong
+        args = tuple(domain.slice(0, len))(args);
+
+        if (len === domainLen) {
+
+          /* jshint validthis: true */
+          var r = f.apply(this, args);
+      
+          // DEBUG HINT: if the debugger stops here, the return value of the function is invalid
+          // mouse over the `r` variable to see what's wrong
+          r = codomain(r);
+      
+          return r;
+
+        } else {
+
+          var curried = Function.prototype.bind.apply(f, [this].concat(args));
+          var newdomain = func(domain.slice(len), codomain);
+          return newdomain.of(curried);
+
+        }
+    
+      }
+    
+      fn.func = {
+        domain: domain,
+        codomain: codomain,
+        f: f
+      };
+    
+      return fn;
+
+    };
+
+    return Func;
 
   }
+
+  // returns true if x is an instrumented function
+  func.is = function (f) {
+    return Func.is(f) && Obj.is(f.func);
+  };
 
   return {
 
@@ -26311,11 +26386,11 @@ module.exports = {
       mixin: mixin,
       merge: merge,
       format: format,
-      isType: isType,
       getName: getName,
       getKind: getKind,
-      isKind: isKind,
-      slice: slice
+      slice: slice,
+      shallowCopy: shallowCopy,
+      update: update
     },
 
     options: options,
@@ -26344,8 +26419,7 @@ module.exports = {
     subtype: subtype,
     list: list,
     dict: dict,
-    func: func,
-    alias: alias
+    func: func
   };
 }));
 

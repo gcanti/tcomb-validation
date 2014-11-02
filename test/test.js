@@ -104,7 +104,8 @@ Price.dispatch = function (value) {
 
 var Size = tuple([Num, Num], 'Size');
 
-var Warranty = dict(Num, 'Warranty');
+var Country = enums.of('US IT', 'Country');
+var Warranty = dict(Country, Num, 'Warranty');
 
 var Product = struct({
   name:       Str,                  
@@ -242,15 +243,20 @@ describe('validate', function () {
 
   describe('dict', function () {
     it('should validate', function () {
-      eqv(validate({x: 1}, Warranty), Ok);
+      eqv(validate({IT: 1}, Warranty), Ok);
       eqv(validate(1, Warranty), result('value is `1`, should be a `Obj`', [], 1, Obj));
-      eqv(validate({x: 'a'}, Warranty), result('["x"] is `"a"`, should be a `Num`', ['x'], 'a', Num));
+      eqv(validate({IT: 'a'}, Warranty), result('["IT"] is `"a"`, should be a `Num`', ['IT'], 'a', Num));
     });
     it('should handle `messages` option', function () {
       eqv(validate(1, Warranty, {messages: 'mymessage'}), result('mymessage', [], 1, Obj));
-      eqv(validate({x: 'a'}, Warranty, {messages: 'mymessage'}), result('mymessage', ['x'], 'a', Num));
+      eqv(validate({IT: 'a'}, Warranty, {messages: 'mymessage'}), result('mymessage', ['IT'], 'a', Num));
       eqv(validate(1, Warranty, {messages: {':input': 'should be a list'}}), result('should be a list', [], 1, Obj));
-      eqv(validate({x: 'a'}, Warranty, {messages: {':type': 'should be a string'}}), result('should be a string', ['x'], 'a', Num));
+      eqv(validate({IT: 'a'}, Warranty, {messages: {':codomain': 'should be a string'}}), result('should be a string', ['IT'], 'a', Num));
+      eqv(validate({x: 1}, Warranty, {messages: {':domain': 'should be a country'}}), result('should be a country', ['x'], 'x', Country));
+    });
+    it('should handle the domain', function () {
+      eqv(validate({'IT': 1}, Warranty), Ok);
+      eqv(validate({x: 1}, Warranty), result('["x"] is `"x"`, should be a `Country`', ['x'], 'x', Country));
     });
   });
 
@@ -286,7 +292,7 @@ describe('validate', function () {
         category:   'category should be a valid enum',         
         price:      {':dispatch': 'price should be expressed in dollars or in another currency', 0: 'price should be a positive number', 1: {':struct': 'price should be an object', currency: 'currency should be a currency', amount: 'amount should be a positive number'}},
         size:        {':input': 'size should be an array of length 2', 0: 'size.width should be a number', 1: 'size.height should be a number'},
-        warranty:  {':input': 'warranty should be a dict of numbers', ':type': 'every element of warranty should be a number'},       
+        warranty:  {':input': 'warranty should be a dict of numbers', ':domain': 'every key of warranty should be a country', ':codomain': 'every element of warranty should be a number'},       
       };
 
       it('should return custom messages', function () {
@@ -320,6 +326,8 @@ describe('validate', function () {
         eqv(validate(p, Product, {messages: messages}), result('size.height should be a number', ['size', 1], 'a', Num));
         p = getPatch({warranty: 1});
         eqv(validate(p, Product, {messages: messages}), result('warranty should be a dict of numbers', ['warranty'], 1, Obj));
+        p = getPatch({warranty: {x: 1}});
+        eqv(validate(p, Product, {messages: messages}), result('every key of warranty should be a country', ['warranty', 'x'], 'x', Country));
         p = getPatch({warranty: {US: 'a'}});
         eqv(validate(p, Product, {messages: messages}), result('every element of warranty should be a number', ['warranty', 'US'], 'a', Num));
       });
@@ -361,6 +369,8 @@ describe('validate', function () {
         eqv(validate(p, Product, {messages: messages}), result('size.1', ['size', 1], 'a', Num));
         p = getPatch({warranty: 1});
         eqv(validate(p, Product, {messages: messages}), result('warranty', ['warranty'], 1, Obj));
+        p = getPatch({warranty: {x: 1}});
+        eqv(validate(p, Product, {messages: messages}), result('warranty.x', ['warranty', 'x'], 'x', Country));
         p = getPatch({warranty: {US: 'a'}});
         eqv(validate(p, Product, {messages: messages}), result('warranty.US', ['warranty', 'US'], 'a', Num));
       });
