@@ -12,297 +12,197 @@
 
   'use strict';
 
-  var Nil = t.Nil;
-  var Err = t.Err;
+  var Any = t.Any;
+  var Obj = t.Obj;
   var Str = t.Str;
   var Arr = t.Arr;
-  var Obj = t.Obj;
-  var Func = t.Func;
-
   var struct = t.struct;
-  var maybe = t.maybe;
   var list = t.list;
-
-  var Type = t.Type;
-  var assert = t.assert;
-  var getName = t.util.getName;
-  var mixin = t.util.mixin;
+  var format = t.util.format;
 
   //
-  // Result model
+  // domain model
   //
 
-  var Result = struct({
-    errors: maybe(list(Err))
+  var ValidationError = struct({
+    message: Str,
+    actual: Any,
+    expected: t.Type,
+    path: list(t.union([Str, t.Num]))
+  }, 'ValidationError');
+
+  function getDefaultMessage(actual, expected, path) {
+    return format('%s is `%j` should be a `%s`', '/' + path.join('/'), actual, t.util.getName(expected));
+  }
+
+  ValidationError.of = function (actual, expected, path) {
+    return new ValidationError({
+      message: getDefaultMessage(actual, expected, path),
+      actual: actual,
+      expected: expected,
+      path: path
+    });
+  };
+
+  var ValidationResult = struct({
+    errors: list(ValidationError),
+    value: Any
   }, 'Result');
 
-  Result.prototype.isValid = function() {
-    return !(this.errors && this.errors.length);
+  ValidationResult.prototype.isValid = function() {
+    return !(this.errors.length);
   };
 
-  Result.prototype.firstError = function() {
-    return this.isValid() ? null : this.errors[0];
+  ValidationResult.prototype.toString = function() {
+    return this.isValid() ?
+      format('[ValidationResult, true, %j]', this.value) :
+      format('[ValidationResult, false, (%s)]', this.errors.map(function (err) {
+        return err.message;
+      }).join(', '));
   };
 
-  // cache ok result
-  var Ok = new Result({errors: null});
-
   //
-  // utils
+  // validate
   //
 
-  function toJSONPath(path) {
-    return path.map(function (prop) {
-      return '[' + JSON.stringify(prop) + ']';
-    }).join('');
+  function _validate(x, type, path) {
+    var kind = t.util.getKind(type);
+    return validators[kind](x, type, path);
   }
 
-  function formatError(message, params) {
-    for (var param in params) {
-      if (params.hasOwnProperty(param)) {
-        message = message.replace(new RegExp(':' + param, 'gim'), params[param]);
-      }
-    }
-    return message;
+  function validate(x, type) {
+    return new ValidationResult(_validate(x, type, []));
   }
 
-  function ko(message, params) {
-    var values = {
-      path: params.path.join('.') || 'value',
-      jsonpath: toJSONPath(params.path) || 'value',
-      actual: JSON.stringify(params.actual),
-      expected: getName(params.expected)
+  var validators = {};
+
+  // irriducibles, enums, subtypes
+  validators.irriducible = 
+  validators.enums = function (x, type, path) {
+    return {
+      value: x,
+      errors: type.is(x) ? [] : [ValidationError.of(x, type, path)]
     };
-    var err = new Error(formatError(message, values));
-    mixin(err, params);
-    return new Result({errors: [err]});
-  }
+  };
 
-  function getMessage(messages, key, defaultMessage) {
-    if (Obj.is(messages) && messages.hasOwnProperty(key)) {
-      return messages[key];
-    } else if (Str.is(messages)) {
-      return messages;
-    }
-    return defaultMessage;
-  }
+  validators.list = function (x, type, path) {
 
-  //
-  // validation functions, one for each kind
-  //
-
-  function validateIrriducible(value, type, opts) {
-
-    if (!type.is(value)) {
-      var message = opts.messages || ':jsonpath is `:actual`, should be a `:expected`';
-      return ko(message, {path: opts.path, actual: value, expected: type});
+    // x should be an array
+    if (!Arr.is(x)) {
+      return {value: x, errors: [ValidationError.of(x, type, path)]};
     }
 
-    return Ok;
-  }
+    var ret = {value: [], errors: []};
+    // every item should be of type `type.meta.type`
+    for (var i = 0, len = x.length ; i < len ; i++ ) {
+      var item = _validate(x[i], type.meta.type, path.concat(i));
+      ret.value[i] = item.value;
+      ret.errors = ret.errors.concat(item.errors);
+    }
+    return ret;
+  };
 
-  function validateStruct(value, type, opts) {
+  validators.subtype = function (x, type, path) {
 
-    if (type.is(value)) {
-      return Ok;
+    // should be a valid inner type
+    var ret = _validate(x, type.meta.type, path);
+    if (ret.errors.length) {
+      return ret;
     }
 
-    var isValid = Obj.is(value);
-
-    if (!isValid) {
-      var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be an `:expected`');
-      return ko(message, {path: opts.path, actual: value, expected: Obj});
+    // should satisfy the predicate
+    if (!type.meta.predicate(ret.value)) {
+      ret.errors = [ValidationError.of(x, type, path)];
     }
 
-    var errors = [];
+    return ret;
+
+  };
+
+  validators.maybe = function (x, type, path) {
+    return t.Nil.is(x) ?
+      {value: null, errors: []} :
+      _validate(x, type.meta.type, path);
+  };
+
+  validators.struct = function (x, type, path) {
+
+    // x should be an object
+    if (!Obj.is(x)) {
+      return {value: x, errors: [ValidationError.of(x, type, path)]};
+    }
+
+    var ret = {value: {}, errors: []};
     var props = type.meta.props;
-    for (var k in props) {
-      if (props.hasOwnProperty(k)) {
-        var result = _validate(value[k], props[k], {path: opts.path.concat([k]), messages: getMessage(opts.messages, k)});
-        if (!result.isValid()) {
-          isValid = false;
-          errors = errors.concat(result.errors);
-        }
+    // every item should be of type `props[name]`
+    for (var name in props) {
+      if (props.hasOwnProperty(name)) {
+        var prop = _validate(x[name], props[name], path.concat(name));
+        ret.value[name] = prop.value;
+        ret.errors = ret.errors.concat(prop.errors);
       }
     }
-
-    if (!isValid) {
-      return new Result({errors: errors});
+    if (!ret.errors.length) {
+      ret.value = new type(ret.value);
     }
+    return ret;    
+  };
 
-    return Ok;
-  }
-
-  function validateMaybe(value, type, opts) {
-    assert(Type.is(type) && type.meta.kind === 'maybe');
-
-    if (!Nil.is(value)) {
-      return _validate(value, type.meta.type, opts);
-    }
-
-    return Ok;
-  }
-
-  function validateSubtype(value, type, opts) {
-
-    var result = _validate(value, type.meta.type, {path: opts.path, messages: getMessage(opts.messages, ':type')});
-    if (!result.isValid()) {
-      return result;
-    }
-
-    var predicate = type.meta.predicate;
-    if (!predicate(value)) {
-      var message = getMessage(opts.messages, ':predicate', ':jsonpath is `:actual`, should be a `:expected`');
-      return ko(message, {path: opts.path, actual: value, expected: type});
-    }
-
-    return Ok;
-  }
-
-  function validateList(value, type, opts) {
-
-    var isValid = Arr.is(value);
-
-    if (!isValid) {
-      var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
-      return ko(message, {path: opts.path, actual: value, expected: Arr});
-    }
-
-    var errors = [];
-    for (var i = 0, len = value.length ; i < len ; i++ ) {
-      var result = _validate(value[i], type.meta.type, {path: opts.path.concat([i]), messages: getMessage(opts.messages, ':type')});
-      if (!result.isValid()) {
-        isValid = false;
-        errors = errors.concat(result.errors);
-      }
-    }
-
-    if (!isValid) {
-      return new Result({errors: errors});
-    }
-
-    return Ok;
-  }
-
-  function validateUnion(value, type, opts) {
-
-    assert(Func.is(type.dispatch), 'unimplemented %s.dispatch()', getName(type));
-    var ctor = type.dispatch(value);
-
-    if (!Func.is(ctor)) {
-      var message = getMessage(opts.messages, ':dispatch', ':jsonpath is `:actual`, should be a `:expected`');
-      return ko(message, {path: opts.path, actual: value, expected: type});
-    }
-
-    var i = type.meta.types.indexOf(ctor);
-    var result = _validate(value, ctor, {path: opts.path, messages: getMessage(opts.messages, i)});
-    if (!result.isValid()) {
-      return result;
-    }
-
-    return Ok;
-  }
-
-  function validateTuple(value, type, opts) {
+  validators.tuple = function (x, type, path) {
 
     var types = type.meta.types;
     var len = types.length;
-    var isValid = Arr.is(value) && value.length === len;
 
-    if (!isValid) {
-      var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
-      return ko(message, {path: opts.path, actual: value, expected: type});
+    // x should be an array of `len` items
+    if (!Arr.is(x) || x.length > len) {
+      return {value: x, errors: [ValidationError.of(x, type, path)]};
     }
 
-    var errors = [];
+    var ret = {value: [], errors: []};
+    // every item should be of type `types[i]`
     for (var i = 0 ; i < len ; i++ ) {
-      var result = _validate(value[i], types[i], {path: opts.path.concat([i]), messages: getMessage(opts.messages, i)});
-      if (!result.isValid()) {
-        isValid = false;
-        errors = errors.concat(result.errors);
+      var item = _validate(x[i], types[i], path.concat(i));
+      ret.value[i] = item.value;
+      ret.errors = ret.errors.concat(item.errors);
+    }
+    return ret;
+  };
+
+  validators.dict = function (x, type, path) {
+
+    // x should be an object
+    if (!Obj.is(x)) {
+      return {value: x, errors: [ValidationError.of(x, type, path)]};
+    }
+
+    var ret = {value: {}, errors: []};
+    // every key should be of type `domain`
+    // every value should be of type `codomain`
+    for (var k in x) {
+      if (x.hasOwnProperty(k)) {
+        path = path.concat(k);
+        var key = _validate(k, type.meta.domain, path);
+        var item = _validate(x[k], type.meta.codomain, path);
+        ret.value[k] = item.value;
+        ret.errors = ret.errors.concat(key.errors, item.errors);
       }
     }
+    return ret;
+  };
 
-    if (!isValid) {
-      return new Result({errors: errors});
-    }
-
-    return Ok;
-  }
-
-  function validateDict(value, type, opts) {
-
-    var isValid = Obj.is(value);
-
-    if (!isValid) {
-      var message = getMessage(opts.messages, ':input', ':jsonpath is `:actual`, should be a `:expected`');
-      return ko(message, {path: opts.path, actual: value, expected: Obj});
-    }
-
-    var errors = [];
-    for (var k in value) {
-      if (value.hasOwnProperty(k)) {
-        // domain
-        var result = _validate(k, type.meta.domain, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':domain')});
-        if (!result.isValid()) {
-          isValid = false;
-          errors = errors.concat(result.errors);
-        }        
-        // codomain
-        result = _validate(value[k], type.meta.codomain, {path: opts.path.concat([k]), messages: getMessage(opts.messages, ':codomain')});
-        if (!result.isValid()) {
-          isValid = false;
-          errors = errors.concat(result.errors);
-        }
-      }
-    }
-
-    if (!isValid) {
-      return new Result({errors: errors});
-    }
-
-    return Ok;
-  }
-
-  function _validate(value, type, opts) {
-    var kind = t.util.getKind(type);
-    switch (kind) {
-      case 'irriducible' :
-      case 'enums' :
-        return validateIrriducible(value, type, opts);
-      case 'struct' :
-        return validateStruct(value, type, opts);
-      case 'maybe' :
-        return validateMaybe(value, type, opts);
-      case 'list' :
-        return validateList(value, type, opts);
-      case 'subtype' :
-        return validateSubtype(value, type, opts);
-      case 'union' :
-        return validateUnion(value, type, opts);
-      case 'tuple' :
-        return validateTuple(value, type, opts);
-      case 'dict' :
-        return validateDict(value, type, opts);
-      default :
-        t.fail('Invalid kind');
-    }
-  }
-
-  function validate(value, type, opts) {
-    opts = opts || {};
-    assert(Type.is(type), 'Invalid argument `type` of value `%j` supplied to `validate`, expected a type', type);
-    assert(maybe(Arr).is(opts.path), 'Invalid argument `opts.path` of value `%j` supplied to `validate`, expected an `Arr`', opts.path);
-
-    opts.path = opts.path || [];
-
-    return _validate(value, type, opts);
-  }
+  validators.union = function (x, type, path) {
+    var ctor = type.dispatch(x);
+    return t.Func.is(ctor)?
+      _validate(x, ctor, path.concat(type.meta.types.indexOf(ctor))) :
+      {value: x, errors: [ValidationError.of(x, type, path)]};
+  };
 
   // exports
-  validate.Ok = Ok;
-  validate.Result = Result;
-  t.validate = validate;
+  t.util.mixin(t, {
+    ValidationError: ValidationError,
+    ValidationResult: ValidationResult,
+    validate: validate
+  });
 
   return t;
 
@@ -26562,11 +26462,7 @@ function toPropTypes(Struct) {
     // React custom prop validator
     // see http://facebook.github.io/react/docs/reusable-components.html
     propTypes[k] = function (values, name, component) {
-      var opts = {
-        path: ['this.props.' + name], 
-        messages: ':path of value `:actual` supplied to `' + component + '`, expected a `:expected`'
-      };
-      return window.validate(values[name], props[name], opts).firstError();
+      return window.validate(values[name], props[name]).errors[0];
     }
   });
 
