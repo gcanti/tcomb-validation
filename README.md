@@ -1,7 +1,3 @@
-% tcomb-validation
-
-![tcomb logo](http://gcanti.github.io/resources/tcomb/logo.png)
-
 A general purpose JavaScript validation library based on type combinators
 
 # Playground
@@ -200,9 +196,11 @@ validate('1.2em', CssLineHeight).isValid(); // => true
 
 ```js
 // a dictionary of numbers
-var Warranty = dict(Num);
+var Country = enums.of('IT, US', 'Country');
+var Warranty = dict(Country, Num);
 
 validate(null, Warranty).isValid();             // => false
+validate({a: 2}, Warranty).isValid();           // => false, ['a'] is not a Country
 validate({US: 2, IT: 'a'}, Warranty).isValid(); // => false, ['IT'] is not a number
 validate({US: 2, IT: 1}, Warranty).isValid();   // => true
 ```
