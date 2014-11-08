@@ -31,7 +31,7 @@
   }, 'ValidationError');
 
   function getDefaultMessage(actual, expected, path) {
-    return format('%s is `%j` should be a `%s`', '/' + path.join('/'), actual, t.util.getName(expected));
+    return format('%s is `%j` should be a `%s`', '/' + path.join('/'), actual, expected.meta.name);
   }
 
   ValidationError.of = function (actual, expected, path) {
@@ -75,7 +75,7 @@
 
   var validators = {};
 
-  // irriducibles, enums, subtypes
+  // irriducibles and enums
   validators.irriducible = 
   validators.enums = function (x, type, path) {
     return {
@@ -103,13 +103,13 @@
 
   validators.subtype = function (x, type, path) {
 
-    // should be a valid inner type
+    // x should be a valid inner type
     var ret = _validate(x, type.meta.type, path);
     if (ret.errors.length) {
       return ret;
     }
 
-    // should satisfy the predicate
+    // x should satisfy the predicate
     if (!type.meta.predicate(ret.value)) {
       ret.errors = [ValidationError.of(x, type, path)];
     }
@@ -152,7 +152,7 @@
     var types = type.meta.types;
     var len = types.length;
 
-    // x should be an array of `len` items
+    // x should be an array of at most `len` items
     if (!Arr.is(x) || x.length > len) {
       return {value: x, errors: [ValidationError.of(x, type, path)]};
     }
