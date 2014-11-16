@@ -34,7 +34,7 @@
     return format('%s is `%j` should be a `%s`', '/' + path.join('/'), actual, expected.meta.name);
   }
 
-  ValidationError.of = function (actual, expected, path) {
+  ValidationError.of = function of(actual, expected, path) {
     return new ValidationError({
       message: getDefaultMessage(actual, expected, path),
       actual: actual,
@@ -48,14 +48,18 @@
     value: Any
   }, 'Result');
 
-  ValidationResult.prototype.isValid = function() {
+  ValidationResult.prototype.isValid = function isValid() {
     return !(this.errors.length);
   };
 
-  ValidationResult.prototype.toString = function() {
+  ValidationResult.prototype.firstError = function firstError() {
+    return this.isValid() ? null : this.errors[0];
+  };
+
+  ValidationResult.prototype.toString = function toString() {
     return this.isValid() ?
       format('[ValidationResult, true, %j]', this.value) :
-      format('[ValidationResult, false, (%s)]', this.errors.map(function (err) {
+      format('[ValidationResult, false, (%s)]', this.errors.map(function errorToString(err) {
         return err.message;
       }).join(', '));
   };
@@ -76,15 +80,15 @@
   var validators = {};
 
   // irriducibles and enums
-  validators.irriducible = 
-  validators.enums = function (x, type, path) {
+  validators.irriducible =
+  validators.enums = function validateIrriducible(x, type, path) {
     return {
       value: x,
       errors: type.is(x) ? [] : [ValidationError.of(x, type, path)]
     };
   };
 
-  validators.list = function (x, type, path) {
+  validators.list = function validateList(x, type, path) {
 
     // x should be an array
     if (!Arr.is(x)) {
@@ -101,7 +105,7 @@
     return ret;
   };
 
-  validators.subtype = function (x, type, path) {
+  validators.subtype = function validateSubtype(x, type, path) {
 
     // x should be a valid inner type
     var ret = _validate(x, type.meta.type, path);
@@ -118,13 +122,13 @@
 
   };
 
-  validators.maybe = function (x, type, path) {
+  validators.maybe = function validateMaybe(x, type, path) {
     return t.Nil.is(x) ?
       {value: null, errors: []} :
       _validate(x, type.meta.type, path);
   };
 
-  validators.struct = function (x, type, path) {
+  validators.struct = function validateStruct(x, type, path) {
 
     // x should be an object
     if (!Obj.is(x)) {
@@ -144,10 +148,10 @@
     if (!ret.errors.length) {
       ret.value = new type(ret.value);
     }
-    return ret;    
+    return ret;
   };
 
-  validators.tuple = function (x, type, path) {
+  validators.tuple = function validateTuple(x, type, path) {
 
     var types = type.meta.types;
     var len = types.length;
@@ -167,7 +171,7 @@
     return ret;
   };
 
-  validators.dict = function (x, type, path) {
+  validators.dict = function validateDict(x, type, path) {
 
     // x should be an object
     if (!Obj.is(x)) {
@@ -189,7 +193,7 @@
     return ret;
   };
 
-  validators.union = function (x, type, path) {
+  validators.union = function validateUnion(x, type, path) {
     var ctor = type.dispatch(x);
     return t.Func.is(ctor)?
       _validate(x, ctor, path.concat(type.meta.types.indexOf(ctor))) :
