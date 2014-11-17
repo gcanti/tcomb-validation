@@ -1,3 +1,7 @@
+v0.2.0
+
+- refactoring
+
 v0.1.3
 
 - upgrade to tcomb v0.3.1

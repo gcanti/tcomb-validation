@@ -12,9 +12,7 @@ Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/
 - validates native types, subtypes, objects, lists and tuples, enums, unions, dicts
 - validates structures with arbitrary level of nesting
 - detailed informations on failed validations
-- lightweight alternative to JSON Schema (4K gzipped bundled with [tcomb](https://github.com/gcanti/tcomb))
-- easy integration with React (`propTypes`) and Backbone (`validate` implementation)
-- output messages are fully customizable
+- lightweight alternative to JSON Schema
 - reuse your domain model written with [tcomb](https://github.com/gcanti/tcomb)
 
 **Contents**
@@ -28,15 +26,10 @@ Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/
   - [Unions](#unions)
   - [Dicts](#dicts)
   - [Nested structures](#nested-structures)
-- [Advanced usage and use cases](#advanced-usage-and-use-cases)
+- [Use cases](#use-cases)
   - [Form validation](#form-validation)
   - [JSON schema](#json-schema)
-  - [An alternative syntax for React propTypes](#an-alternative-syntax-for-react-proptypes)
-  - [Full debugging support for React components](#full-debugging-support-for-react-components)
-  - [Backbone validation](#backbone-validation)
-  - [Full debugging support for Backbone models](#full-debugging-support-for-backbone-models)
 - [Api reference](#api-reference)
-- [Articles on tcomb-validation](#articles-on-tcomb-validation)
 
 # Basic usage
 
@@ -45,20 +38,20 @@ Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/
 The main function is `validate`:
 
 ```js
-validate(value, spec) -> Result
+validate(value, type) -> ValidationResult
 ```
 
 - `value` the value to validate
-- `spec` a type defined with the [tcomb](https://github.com/gcanti/tcomb) library
+- `type` a type defined with the [tcomb](https://github.com/gcanti/tcomb) library
 
-returns a `Result` object containing the result of the validation
+returns a `ValidationResult` object containing the result of the validation
 
 Example
 
 ```js
-var Tcomb = require('tcomb-validation');
-var validate = Tcomb.addons.validation.validate;
-var Str = Tcomb.Str; // a string type
+var t = require('tcomb-validation');
+var validate = t.validate;
+var Str = t.Str; // a string type
 
 validate(1, Str).isValid();   // => false
 validate('a', Str).isValid(); // => true
@@ -69,7 +62,7 @@ You can inspect the result to quickly identify what's wrong:
 ```js
 var result = validate(1, Str);
 result.isValid();     // => false
-result.firstError();  // => new Error('value is `1`, should be a `Str`')
+result.firstError();  // => 'value is `1`, should be a `Str`'
 
 // see `result.errors` to inspect all errors
 ```
@@ -132,7 +125,7 @@ validate(1, Positive).isValid();  // => true
 ```js
 // an object with two numerical properties
 var Point = struct({
-  x: Num, 
+  x: Num,
   y: Num
 });
 
@@ -181,12 +174,6 @@ validate('left', CssTextAlign).isValid();   // => true
 ```js
 var CssLineHeight = union([Num, Str]);
 
-// in order to make it work, we must implement the #dispath method
-CssLineHeight.dispatch = function (x) {
-  if (Num.is(x)) { return Num; }
-  else if (Str.is(x)) { return Str; }
-};
-
 validate(null, CssLineHeight).isValid();    // => false
 validate(1.4, CssLineHeight).isValid();     // => true
 validate('1.2em', CssLineHeight).isValid(); // => true
@@ -223,10 +210,10 @@ var mypost = {
 };
 
 validate(mypost, Post).isValid();     // => false
-validate(mypost, Post).firstError();  // => new Error('tags[1] is `1`, should be a `Str`')
+validate(mypost, Post).firstError();  // => 'tags[1] is `1`, should be a `Str`'
 ```
 
-# Advanced usage and use cases
+# Use cases
 
 ## Form validation
 
@@ -247,19 +234,7 @@ var formValues = {
 // if formValues = {username: null, password: 'password'}
 var result = validate(formValues, SignInInfo);
 result.isValid();     // => false
-result.firstError();  // => new Error('username is `null`, should be a `Str`')
-```
-
-You can customize the output to return your messages or simply the names of the invalid props for further processing:
-
-```js
-var result = validate(formValues, SignInInfo, {messages: ':path'});
-result.firstError(); // => new Error('username')
-
-// display invalid fields to the user
-result.errors.forEach(function (err) {
-  $('#' + err.message).parent().addClass('has-error'); // Bootstrap 3
-});
+result.firstError();  // => 'username is `null`, should be a `Str`'
 ```
 
 ## JSON schema
@@ -268,16 +243,16 @@ If you don't want to use a JSON Schema validator or it's not applicable, you can
 
 ```json
 {
-  "type": "object", 
+  "type": "object",
   "properties": {
     "foo": {
       "type": "number"
-    }, 
+    },
     "bar": {
-      "type": "string", 
+      "type": "string",
       "enum": [
-        "a", 
-        "b", 
+        "a",
+        "b",
         "c"
       ]
     }
@@ -298,7 +273,7 @@ let's validate the example JSON:
 
 ```js
 var json = {
-  "foo": "this is a string, not a number", 
+  "foo": "this is a string, not a number",
   "bar": "this is a string that isn't allowed"
 };
 
@@ -306,147 +281,36 @@ validate(json, Schema).isValid(); // => false
 
 // the returned errors are:
 [
-  new Error('foo is `"this is a string, not a number"`, should be a `Num`'),
-  new Error('bar is `"this is a string that isn\'t allowed"`, should be a `enums`')
+  'foo is `"this is a string, not a number"`, should be a `Num`',
+  'bar is `"this is a string that isn\'t allowed"`, should be a `enums`'
 ]
 ```
 
 **Note**: A feature missing in standard JSON Schema is the powerful [subtype](#subtypes) syntax.
 
-## An alternative syntax for React propTypes
-
-**UPDATE**: since the last release of this library, I wrote a separate project to maximize the control 
-over React components, see [here](https://github.com/gcanti/tcomb-react).
-
-You can also use this library as an alternative syntax for the React.js `propTypes`, taking advantage of its expressive syntax:
-
-```js
-// define the component props
-var MyProps = struct({
-  foo: Num,
-  bar: subtype(Str, function (s) { return s.length <= 3; }, 'Bar')
-});
-
-// a simple component
-var MyComponent = React.createClass({
-
-  propTypes: toPropTypes(MyProps), // <--- !
-
-  render: function () {
-    return (
-      <div>
-        <div>Foo is: {this.props.foo}</div>
-        <div>Bar is: {this.props.bar}</div>
-      </div>
-    );
-  }    
-});
-
-// try to use bad props
-var props = {
-  "foo": "this is a string, not a number", 
-  "bar": "this is a string too long"
-};
-
-// rendering
-React.renderComponentToString(MyComponent(props));
-
-// prints to console:
-// => Warning: this.props.foo of value `"this is a string, not a number"` supplied to `undefined`, expected a `Num`
-// => Warning: Warning: this.props.bar of value `"this is a string too long"` supplied to `undefined`, expected a `Bar`
-```
-*You can find the `toPropTypes` function [here](https://github.com/gcanti/tcomb-react)*
-
-## Full debugging support for React components
-
-**UPDATE**: since the last release of this library, I wrote a separate project to maximize the control 
-over React components, see [here](https://github.com/gcanti/tcomb-react).
-
-A complete alternative to `propTypes` is adding this simple snippet to your `render` methods to obtain a full debugging support:
-
-```js
-//
-// if bad props are passed, the debugger kicks in
-//
-// define the component props
-var MyProps = struct({
-  foo: Num,
-  bar: subtype(Str, function (s) { return s.length <= 3; }, 'Bar'),
-  children: Any
-});
-
-var MyComponent = React.createClass({
-  render: function () {
-    this.props = MyProps(this.props); // <--- !
-    return (
-      <div>
-        <div>Foo is: {this.props.foo}</div>
-        <div>Bar is: {this.props.bar}</div>
-      </div>
-    );
-  }    
-});
-```
-
-## Backbone validation
-
-```js
-// attributes definition
-var Attrs = struct({
-  x: Num,
-  y: Num
-});
-
-var options = {validate: true};
-
-var Model = Backbone.Model.extend({
-  validate: function (attrs, options) {
-    return validate(attrs, Attrs).errors;
-  }
-});
-
-// first validation (OK)
-var model = new Model({x: 1, y: 2}, options);
-console.log(model.attributes); // => { x: 1, y: 2 }
-
-// second validation (KO)
-model.set({x: 'a'}, options);  // bad attribute
-console.log(model.attributes); // => { x: 1, y: 2 } attributes are unchanged
-```
-
-## Full debugging support for Backbone models
-
-To obtain a full debugging support simply modify the `validate` method:
-
-```js
-//
-// if bad attributes are passed, the debugger kicks in
-//
-
-var Model = Backbone.Model.extend({
-  validate: function (attrs, options) {
-    Attrs(attrs); // <--- !
-  }
-});
-
-// bad call
-var model = new Model({x: 1, y: 'a'}, options);
-```
-
 # Api reference
 
-## Result
+## ValidationResult
 
-`Result` is a struct containing an `errors` prop which is:
+`ValidationResult` represents the result of a validation. It containes the following fields:
 
-- a list of `Error` if validation fails 
-- or `null` if succeded.
+- `errors`: a list of `ValidationError` if validation fails
+- `value`: an instance of `type` if validation succeded
 
 ```js
-// the definition of `Result`
-var Result = struct({
-  errors: maybe(list(Err))
-});
+// the definition of `ValidationResult`
+var ValidationResult = struct({
+  errors: list(ValidationError),
+  value: Any
+}, 'ValidationResult');
+
+// the definition of `ValidationError`
+var ValidationError = struct({
+  message: Str,                     // a default message for developers
+  actual: Any,                      // the actual value being validated
+  expected: t.Type,                 // the type expected
+  path: list(t.union([Str, t.Num])) // the path of the value
+}, 'ValidationError');
 ```
 
 ### #isValid()
@@ -455,79 +319,24 @@ Returns true if there are no errors.
 
 ```js
 validate('a', Str).isValid(); // => true
-```  
+```
 
 ### #firstError()
 
 Returns the first error or `null` if validation succeded.
 
 ```js
-validate(1, Str).firstError(); // => new Error('value is `1`, should be a `Str`')
-```  
+validate(1, Str).firstError(); // => 'value is `1`, should be a `Str`'
+```
 
-## validate(value, type, [opts]) -> Result
+## validate(value, type) -> ValidationResult
 
 - `value` the value to validate
 - `type` a type defined with the tcomb library
-- `opts` options hash
-
-### opts.messages
-
-Customizes the error messages:
-
-```js
-var Point = struct({
-  x: Num, 
-  y: Num
-});
-
-var myMessages = {
-  x: 'x should be a number',
-  y: 'y should be a number'
-};
-
-var result = validate({x: 'a'}, Point, {messages: myMessages}); 
-console.log(result.errors);
-
-// outputs
-[
-  new Error('x should be a number'),
-  new Error('y should be a number')
-]
-```
-
-**Placeholders**
-
-In your custom messages, you can use the following placeholders:
-
-- `:path`: the path of the offending value
-- `:jsonpath`: the path of the offending value in [JSON Path](http://goessner.net/articles/JsonPath/) format 
-- `:actual`: the actual offending value
-- `:expected`: the type of the expected value
-
-```js
-myMessages = {
-  x: ':jsonpath = :actual instead of a :expected',
-  y: ':jsonpath = :actual instead of a :expected'
-};
-
-var result = validate({x: 'a'}, Point, {messages: myMessages}); 
-console.log(result.errors);
-
-// outputs
-[
-  new Error('["x"] = "a" instead of a Num'),
-  new Error('["y"] = undefined instead of a Num')
-]
-```
-
-# Articles on tcomb-validation
-
-- [JSON API Validation In Node.js](http://gcanti.github.io/2014/09/15/json-api-validation-in-node.html)
 
 # Tests
 
-Run `mocha` in the project root.
+Run `npm test`
 
 # License
 

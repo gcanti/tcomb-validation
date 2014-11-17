@@ -1,57 +1,10 @@
-/** @jsx React.DOM */
-
 $(function () {
 
 'use strict';
 
 var t = require('../index');
 var React = require('react');
-var bs = require('tcomb-react-bootstrap');
 var v = t.validate;
-
-//
-// import all bootstrap components
-//
-
-var Accordion = bs.Accordion;
-var Affix = bs.Affix;
-var Alert = bs.Alert;
-var Badge = bs.Badge;
-var Button = bs.Button;
-var ButtonGroup = bs.ButtonGroup;
-var ButtonToolbar = bs.ButtonToolbar;
-var Carousel = bs.Carousel;
-var CarouselItem = bs.CarouselItem;
-var Col = bs.Col;
-var DropdownButton = bs.DropdownButton;
-var DropdownMenu = bs.DropdownMenu;
-var Glyphicon = bs.Glyphicon;
-var Grid = bs.Grid;
-var Input = bs.Input;
-var Jumbotron = bs.Jumbotron;
-var Label = bs.Label;
-var MenuItem = bs.MenuItem;
-var Modal = bs.Modal;
-var ModalTrigger = bs.ModalTrigger;
-var Nav = bs.Nav;
-var Navbar = bs.Navbar;
-var NavItem = bs.NavItem;
-var OverlayTrigger = bs.OverlayTrigger;
-var PageHeader = bs.PageHeader;
-var PageItem = bs.PageItem;
-var Pager = bs.Pager;
-var Panel = bs.Panel;
-var PanelGroup = bs.PanelGroup;
-var Popover = bs.Popover;
-var ProgressBar = bs.ProgressBar;
-var Row = bs.Row;
-var SplitButton = bs.SplitButton;
-var SubNav = bs.SubNav;
-var TabbedArea = bs.TabbedArea;
-var Table = bs.Table;
-var TabPane = bs.TabPane;
-var Tooltip = bs.Tooltip;
-var Well = bs.Well;
 
 //
 // utils
@@ -60,22 +13,6 @@ var Well = bs.Well;
 function repo(name, title) {
   title = title || name;
   return <a href="https://github.com/gcanti/{name}">{title}</a>
-}
-
-function toPropTypes(Struct) {
-  
-  var propTypes = {};
-  var props = Struct.meta.props;
-  
-  Object.keys(props).forEach(function (k) {
-    // React custom prop validator
-    // see http://facebook.github.io/react/docs/reusable-components.html
-    propTypes[k] = function (values, name, component) {
-      return window.validate(values[name], props[name]).errors[0];
-    }
-  });
-
-  return propTypes;
 }
 
 //
@@ -126,20 +63,6 @@ var scripts = {
   },
   jsonschema: {
     label: 'an alternative syntax for JSON Schema'
-  },
-  react: {
-    label: 'React - an alternative syntax for propTypes'
-  },
-  react_debugging: {
-    label: 'React - with full debugging support (remember to open up the console)',
-    debug: true
-  },
-  backbone: {
-    label: 'Backbone - `validate()` implementation'
-  },
-  backbone_debugging: {
-    label: 'Backbone - with full debugging support (remember to open up the console)',
-    debug: true
   }
 };
 
@@ -191,21 +114,21 @@ window.validate = function (value, type, opts) {
 var Header = React.createClass({
   render: function () {
     return (
-      <Row className="header">
-        <Col md={6}>
+      <div className="row header">
+        <div className="col-md-6">
           <h1>{repo('tcomb-validation')} playground</h1>
           <p className="text-muted">A JavaScript validation library based on type combinators</p>
           <br/>
           <p>
-            Concise yet expressive syntax, full debugging support, seamless integration with React and Backbone.
+            Concise yet expressive syntax, full debugging support.
           </p>
-        </Col>
-        <Col md={6}>
+        </div>
+        <div className="col-md-6">
           <div className="text-right repo-link">
               <p>My <a href="/">blog</a></p>
           </div>
-        </Col>
-      </Row>
+        </div>
+      </div>
     );
   }
 });
@@ -213,33 +136,32 @@ var Header = React.createClass({
 var Footer = React.createClass({
   render: function () {
     return (
-      <Row className="text-muted">
-        <Col md={1}>
+      <div className="row text-muted">
+        <div className="col-md-1">
           <strong>Credits:</strong>
-        </Col>
-        <Col md={11}>
+        </div>
+        <div className="col-md-11">
           <ul>
             <li>{repo('tcomb-validation')} <i>"General purpose validation library for JavaScript"</i></li>
             <li>{repo('tcomb')} <i>"Pragmatic runtime type checking for JavaScript "</i></li>
             <li><a href="http://facebook.github.io/react/index.html">React.js</a></li>
-            <li><a href="http://backbonejs.org">Backbone.js</a></li>
           </ul>
-        </Col>
-      </Row>
+        </div>
+      </div>
     );
   }
 });
 
 var Example = React.createClass({
   onChange: function () {
-    var value = this.refs.example.getValue();
+    var value = this.refs.example.getDOMNode().value;
     this.props.onChange(value);
   },
   render: function () {
     return (
-      <Input ref="example" type="select" value={this.props.name} onChange={this.onChange}>
+      <select className="form-control" ref="example" defaultValue={this.props.name} onChange={this.onChange}>
         {options}
-      </Input>
+      </select>
     );
   }
 });
@@ -250,24 +172,24 @@ var Validation = React.createClass({
     var validation;
     if (results instanceof Error) {
       validation = (
-        <Alert bsStyle="danger">
+        <div className="alert alert-danger">
           {results.message}
-        </Alert>
+        </div>
       );
     } else {
       validation = results.map(function (result) {
         if (result.isValid()) {
           return (
-            <Alert bsStyle="success">
+            <div className="alert alert-success">
               ok
-            </Alert>
+            </div>
           );
         } else {
           return result.errors.map(function (e, i) {
             return (
-              <Alert bsStyle="danger">
+              <div className="alert alert-danger">
                 {e.message}
-              </Alert>
+              </div>
             );
           });
         }
@@ -353,17 +275,17 @@ var Main = React.createClass({
     var code = this.state.code;
     var err = this.eval(code);
     return (
-      <Grid>
+      <div className="container">
         <Header/>
-        <Row>
-          <Col md={6}>
+        <div className="row">
+          <div className="col-md-6">
             <p className="lead">Choose a code example, or write your own</p>
             <Example name={this.state.name} onChange={this.onExampleChange}/>
             <p className="text-muted">Open up the console for a complete debugging experience..</p>
             <CodeMirrorComponent code={this.state.code} onChange={this.onCodeChange}/>
-          </Col>
-          <Col md={6}>
-            { this.state.name === 'form' ? 
+          </div>
+          <div className="col-md-6">
+            { this.state.name === 'form' ?
               <div>
                 <p className="lead">Form</p>
                 <form id="myform" role="form" method="post">
@@ -374,19 +296,19 @@ var Main = React.createClass({
                     <input type="password" id="password" placeholder="Password" className="form-control"/>
                   </div>
                   <button className="btn btn-primary btn-block">Sign in</button>
-                </form>                
+                </form>
               </div>
-              : 
+              :
               <div>
                 <p className="lead">Validation result</p>
                 <Validation results={err instanceof Error ? err : results}/>
               </div>
             }
-          </Col>
-        </Row>
+          </div>
+        </div>
         <hr/>
         <Footer/>
-      </Grid>
+      </div>
     );
   }
 });

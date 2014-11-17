@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>tcomb-validation playground</title>
-    
+
     <link type="text/css" rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css"/>
     <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
     <script type="text/javascript" src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
@@ -65,7 +65,7 @@ validate(1, Positive);
 </script>
 <script type="text/example" id="objects">// an object with two numerical properties
 var Point = struct({
-  x: Num, 
+  x: Num,
   y: Num
 }, 'Point');
 
@@ -144,118 +144,11 @@ var Schema = struct({
 });
 
 var json = {
-  "foo": "this is a string, not a number", 
+  "foo": "this is a string, not a number",
   "bar": "this is a string that isn't allowed"
 };
 
 validate(json, Schema);
-</script>
-<script type="text/example" id="react">/** @jsx React.DOM */
-
-// define the component props
-var MyProps = struct({
-  foo: Num,
-  bar: subtype(Str, function (s) { return s.length <= 3; }, 'Bar')
-});
-
-// a simple component
-var MyComponent = React.createClass({
-
-  propTypes: toPropTypes(MyProps), // <--- !
-  
-  render: function () {
-    return (
-      <div>
-        <div>Foo is: {this.props.foo}</div>
-        <div>Bar is: {this.props.bar}</div>
-      </div>
-    );
-  }    
-});
-
-// try to use bad props
-var props = {
-  "foo": "this is a string, not a number", 
-  "bar": "this is a string too long"
-};
-
-// rendering
-React.renderComponentToString(MyComponent(props));
-</script>
-<script type="text/example" id="react_debugging">/** @jsx React.DOM */
-
-//
-// if bad props are passed, the debugger kicks in
-//
-
-// define the component props
-var MyProps = struct({
-  foo: Num,
-  bar: subtype(Str, function (s) { return s.length <= 3; }, 'Bar')
-});
-
-var MyComponent = React.createClass({
-  render: function () {
-    this.props = MyProps(this.props); // <--- !
-    return (
-      <div>
-        <div>Foo is: {this.props.foo}</div>
-        <div>Bar is: {this.props.bar}</div>
-      </div>
-    );
-  }    
-});
-
-// try to use bad props
-var props = {
-  "foo": "this is a string, not a number", 
-  "bar": "this is a string too long"
-};
-
-// rendering
-React.renderComponentToString(MyComponent(props));
-</script>
-<script type="text/example" id="backbone">// attributes definition
-var Attrs = struct({
-  x: Num,
-  y: Num
-});
-
-var options = {validate: true};
-
-var Model = Backbone.Model.extend({
-  validate: function (attrs, options) {
-    return validate(attrs, Attrs).errors;
-  }
-});
-
-// first validation (OK)
-var model = new Model({x: 1, y: 2}, options);
-console.log(model.attributes); // => { x: 1, y: 2 }
-
-// second validation (KO)
-model.set({x: 'a'}, options);  // bad attribute
-console.log(model.attributes); // => { x: 1, y: 2 } attributes are unchanged
-</script>
-<script type="text/example" id="backbone_debugging">//
-// if bad attributes are passed, the debugger kicks in
-//
-
-var Attrs = struct({
-  x: Num,
-  y: Num
-});
-
-var options = {validate: true};
-
-var Model = Backbone.Model.extend({
-  validate: function (attrs, options) {
-    attrs = Attrs(attrs); // <--- !
-  }
-});
-
-// bad call
-var model = new Model({x: 1, y: 'a'}, options);
 </script>
 <script type="text/example" id="form">// Let's design the process for a simple sign in form:
 

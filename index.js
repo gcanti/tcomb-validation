@@ -46,7 +46,7 @@
   var ValidationResult = struct({
     errors: list(ValidationError),
     value: Any
-  }, 'Result');
+  }, 'ValidationResult');
 
   ValidationResult.prototype.isValid = function isValid() {
     return !(this.errors.length);
