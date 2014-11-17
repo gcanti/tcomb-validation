@@ -67,7 +67,7 @@ validate(1, Positive);
 var Point = struct({
   x: Num, 
   y: Num
-});
+}, 'Point');
 
 validate(null, Point);
 validate({x: 0}, Point);
@@ -75,7 +75,7 @@ validate({x: 0, y: 'a'}, Point);
 validate({x: 0, y: 0}, Point);
 </script>
 <script type="text/example" id="lists">// a list of strings
-var Words = list(Str);
+var Words = list(Str, 'Words');
 
 validate(null, Words);
 validate(['hello', 1], Words);
@@ -105,12 +105,18 @@ validate(null, CssLineHeight);
 validate(1.4, CssLineHeight);
 validate('1.2em', CssLineHeight);
 </script>
-<script type="text/example" id="dict">// years of warranty per country
-var Warranty = dict(Num, 'Warranty');
+<script type="text/example" id="dict">var Key = t.subtype(Str, function (k) {
+  return k.length >= 2;
+}, 'Key');
+var Value = t.subtype(Num, function (n) {
+  return n >= 0;
+}, 'Value');
+var Dict = t.dict(Key, Value, 'Dict');
 
-validate(null, Warranty);
-validate({US: 2}, Warranty);
-validate({US: 2, IT: 'a'}, Warranty);
+validate(null, Dict);
+validate({aa: 2}, Dict);
+validate({a: 2}, Dict);
+validate({aa: -2}, Dict);
 </script>
 <script type="text/example" id="nested">// a list of strings
 var Words = list(Str);
@@ -267,14 +273,14 @@ $('#app').on('submit', '#myform', function (evt) {
   };
 
   // validation
-  var result = validate(formValues, SignInInfo, {messages: ':path'});
+  var result = validate(formValues, SignInInfo);
 
   // feedback
   $('#myform .form-group').removeClass('has-error').addClass('has-success');
   if (!result.isValid()) {
     evt.preventDefault();
     result.errors.forEach(function (err) {
-      $('#' + err.message).parent().addClass('has-error');
+      $('#' + err.path[0]).parent().addClass('has-error');
     });
   } else {
     // send values to server..
