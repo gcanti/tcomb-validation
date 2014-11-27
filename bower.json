@@ -1,7 +1,7 @@
 {
   "name": "tcomb-validation",
   "main": "index.js",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "homepage": "https://github.com/gcanti/tcomb-validation",
   "authors": [
     "gcanti <giulio.canti@gmail.com>"
@@ -13,7 +13,7 @@
     "node"
   ],
   "dependencies": {
-    "tcomb": "^0.3.3"
+    "tcomb": "^0.3.4"
   },
   "keywords": [
     "validation"

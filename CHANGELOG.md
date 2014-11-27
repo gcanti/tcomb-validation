@@ -1,3 +1,7 @@
+v0.2.1
+
+- update to tcomb v0.3.4
+
 v0.2.0
 
 - refactoring
