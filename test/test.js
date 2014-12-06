@@ -28,7 +28,7 @@ function success(value) {
 //
 
 var ok = function (x) { assert.strictEqual(true, x); };
-var eq = assert.deepEqual; 
+var eq = assert.deepEqual;
 
 describe('validate()', function () {
 
@@ -58,6 +58,7 @@ describe('validate()', function () {
     eq(validate({x: 0, y: 0}, Point), success({x: 0, y: 0}));
     ok(validate({x: 0, y: 0}, Point).value instanceof Point);
     eq(validate({x: 0, y: 'a'}, Point), failure('a', Num, ['y'], '/y is `"a"` should be a `Num`', {x: 0, y: 'a'}));
+    eq(validate(new Point({x: 0, y: 0}), Point), success({x: 0, y: 0}));
   });
 
   it('list', function () {

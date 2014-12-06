@@ -1,3 +1,7 @@
+v0.2.2
+
+- added optimization of structs validation when `value` is an instance of `type`
+
 v0.2.1
 
 - update to tcomb v0.3.4
