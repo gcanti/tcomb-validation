@@ -1,6 +1,6 @@
 {
   "name": "tcomb-validation",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "General purpose validation library for JavaScript",
   "main": "index.js",
   "scripts": {
@@ -18,7 +18,7 @@
   },
   "homepage": "https://github.com/gcanti/tcomb-validation",
   "dependencies": {
-    "tcomb": "^0.3.4"
+    "tcomb": "^0.3.5"
   },
   "devDependencies": {
     "grunt": "^0.4.5",
