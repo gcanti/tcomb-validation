@@ -77,11 +77,11 @@
     return validators[kind](x, type, path);
   }
 
-  var validators = {};
+  var validators = validate.validators = {};
 
-  // irriducibles and enums
-  validators.irriducible =
-  validators.enums = function validateIrriducible(x, type, path) {
+  // irreducibles and enums
+  validators.irreducible =
+  validators.enums = function validateIrreducible(x, type, path) {
     return {
       value: x,
       errors: type.is(x) ? [] : [ValidationError.of(x, type, path)]
