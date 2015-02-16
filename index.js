@@ -17,7 +17,7 @@
   var Arr = t.Arr;
   var struct = t.struct;
   var list = t.list;
-  var format = t.util.format;
+  var format = t.format;
 
   //
   // domain model
@@ -73,8 +73,7 @@
   }
 
   function recurse(x, type, path) {
-    var kind = t.util.getKind(type);
-    return validators[kind](x, type, path);
+    return validators[type.meta.kind](x, type, path);
   }
 
   var validators = validate.validators = {};
@@ -206,7 +205,7 @@
   };
 
   // exports
-  t.util.mixin(t, {
+  t.mixin(t, {
     ValidationError: ValidationError,
     ValidationResult: ValidationResult,
     validate: validate

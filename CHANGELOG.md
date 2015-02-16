@@ -1,3 +1,7 @@
+v1.0
+
+- update to tcomb v1.0
+
 v0.3.0
 
 - update to tcomb v0.4

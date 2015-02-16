@@ -18,7 +18,7 @@
   var Arr = t.Arr;
   var struct = t.struct;
   var list = t.list;
-  var format = t.util.format;
+  var format = t.format;
 
   //
   // domain model
@@ -69,20 +69,19 @@
   // validate
   //
 
-  function _validate(x, type, path) {
-    var kind = t.util.getKind(type);
-    return validators[kind](x, type, path);
-  }
-
   function validate(x, type) {
-    return new ValidationResult(_validate(x, type, []));
+    return new ValidationResult(recurse(x, type, []));
   }
 
-  var validators = {};
+  function recurse(x, type, path) {
+    return validators[type.meta.kind](x, type, path);
+  }
 
-  // irriducibles and enums
-  validators.irriducible =
-  validators.enums = function validateIrriducible(x, type, path) {
+  var validators = validate.validators = {};
+
+  // irreducibles and enums
+  validators.irreducible =
+  validators.enums = function validateIrreducible(x, type, path) {
     return {
       value: x,
       errors: type.is(x) ? [] : [ValidationError.of(x, type, path)]
@@ -99,7 +98,7 @@
     var ret = {value: [], errors: []};
     // every item should be of type `type.meta.type`
     for (var i = 0, len = x.length ; i < len ; i++ ) {
-      var item = _validate(x[i], type.meta.type, path.concat(i));
+      var item = recurse(x[i], type.meta.type, path.concat(i));
       ret.value[i] = item.value;
       ret.errors = ret.errors.concat(item.errors);
     }
@@ -109,7 +108,7 @@
   validators.subtype = function validateSubtype(x, type, path) {
 
     // x should be a valid inner type
-    var ret = _validate(x, type.meta.type, path);
+    var ret = recurse(x, type.meta.type, path);
     if (ret.errors.length) {
       return ret;
     }
@@ -126,7 +125,7 @@
   validators.maybe = function validateMaybe(x, type, path) {
     return t.Nil.is(x) ?
       {value: null, errors: []} :
-      _validate(x, type.meta.type, path);
+      recurse(x, type.meta.type, path);
   };
 
   validators.struct = function validateStruct(x, type, path) {
@@ -136,12 +135,17 @@
       return {value: x, errors: [ValidationError.of(x, type, path)]};
     }
 
+    // [optimization]
+    if (type.is(x)) {
+      return {value: x, errors: []};
+    }
+
     var ret = {value: {}, errors: []};
     var props = type.meta.props;
     // every item should be of type `props[name]`
     for (var name in props) {
       if (props.hasOwnProperty(name)) {
-        var prop = _validate(x[name], props[name], path.concat(name));
+        var prop = recurse(x[name], props[name], path.concat(name));
         ret.value[name] = prop.value;
         ret.errors = ret.errors.concat(prop.errors);
       }
@@ -165,7 +169,7 @@
     var ret = {value: [], errors: []};
     // every item should be of type `types[i]`
     for (var i = 0 ; i < len ; i++ ) {
-      var item = _validate(x[i], types[i], path.concat(i));
+      var item = recurse(x[i], types[i], path.concat(i));
       ret.value[i] = item.value;
       ret.errors = ret.errors.concat(item.errors);
     }
@@ -185,8 +189,8 @@
     for (var k in x) {
       if (x.hasOwnProperty(k)) {
         path = path.concat(k);
-        var key = _validate(k, type.meta.domain, path);
-        var item = _validate(x[k], type.meta.codomain, path);
+        var key = recurse(k, type.meta.domain, path);
+        var item = recurse(x[k], type.meta.codomain, path);
         ret.value[k] = item.value;
         ret.errors = ret.errors.concat(key.errors, item.errors);
       }
@@ -197,12 +201,12 @@
   validators.union = function validateUnion(x, type, path) {
     var ctor = type.dispatch(x);
     return t.Func.is(ctor)?
-      _validate(x, ctor, path.concat(type.meta.types.indexOf(ctor))) :
+      recurse(x, ctor, path.concat(type.meta.types.indexOf(ctor))) :
       {value: x, errors: [ValidationError.of(x, type, path)]};
   };
 
   // exports
-  t.util.mixin(t, {
+  t.mixin(t, {
     ValidationError: ValidationError,
     ValidationResult: ValidationResult,
     validate: validate
@@ -480,7 +484,6 @@ module.exports = BeforeInputEventPlugin;
  */
 var isUnitlessNumber = {
   columnCount: true,
-  fillOpacity: true,
   flex: true,
   flexGrow: true,
   flexShrink: true,
@@ -492,7 +495,11 @@ var isUnitlessNumber = {
   orphans: true,
   widows: true,
   zIndex: true,
-  zoom: true
+  zoom: true,
+
+  // SVG-related properties
+  fillOpacity: true,
+  strokeOpacity: true
 };
 
 /**
@@ -3732,7 +3739,11 @@ var HTMLDOMPropertyConfig = {
     draggable: null,
     encType: null,
     form: MUST_USE_ATTRIBUTE,
+    formAction: MUST_USE_ATTRIBUTE,
+    formEncType: MUST_USE_ATTRIBUTE,
+    formMethod: MUST_USE_ATTRIBUTE,
     formNoValidate: HAS_BOOLEAN_VALUE,
+    formTarget: MUST_USE_ATTRIBUTE,
     frameBorder: MUST_USE_ATTRIBUTE,
     height: MUST_USE_ATTRIBUTE,
     hidden: MUST_USE_ATTRIBUTE | HAS_BOOLEAN_VALUE,
@@ -3747,6 +3758,8 @@ var HTMLDOMPropertyConfig = {
     list: MUST_USE_ATTRIBUTE,
     loop: MUST_USE_PROPERTY | HAS_BOOLEAN_VALUE,
     manifest: MUST_USE_ATTRIBUTE,
+    marginHeight: null,
+    marginWidth: null,
     max: null,
     maxLength: MUST_USE_ATTRIBUTE,
     media: MUST_USE_ATTRIBUTE,
@@ -4437,7 +4450,7 @@ if ("production" !== process.env.NODE_ENV) {
 
 // Version exists only in the open-source version of React, not in Facebook's
 // internal version.
-React.version = '0.12.0';
+React.version = '0.12.2';
 
 module.exports = React;
 
@@ -6868,7 +6881,7 @@ var ReactCompositeComponentMixin = {
       boundMethod.__reactBoundArguments = null;
       var componentName = component.constructor.displayName;
       var _bind = boundMethod.bind;
-      boundMethod.bind = function(newThis ) {var args=Array.prototype.slice.call(arguments,1);
+      boundMethod.bind = function(newThis ) {for (var args=[],$__0=1,$__1=arguments.length;$__0<$__1;$__0++) args.push(arguments[$__0]);
         // User is trying to bind() an autobound method; we effectively will
         // ignore the value of "this" that the user is trying to use, so
         // let's warn.
@@ -9217,7 +9230,7 @@ var ReactDefaultPerf = {
   },
 
   measure: function(moduleName, fnName, func) {
-    return function() {var args=Array.prototype.slice.call(arguments,0);
+    return function() {for (var args=[],$__0=0,$__1=arguments.length;$__0<$__1;$__0++) args.push(arguments[$__0]);
       var totalTime;
       var rv;
       var start;
@@ -9721,7 +9734,7 @@ ReactElement.createElement = function(type, config, children) {
   }
 
   // Resolve default props
-  if (type.defaultProps) {
+  if (type && type.defaultProps) {
     var defaultProps = type.defaultProps;
     for (propName in defaultProps) {
       if (typeof props[propName] === 'undefined') {
@@ -9790,6 +9803,7 @@ module.exports = ReactElement;
 
 }).call(this,require('_process'))
 },{"./ReactContext":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/ReactContext.js","./ReactCurrentOwner":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/ReactCurrentOwner.js","./warning":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/warning.js","_process":"/usr/local/lib/node_modules/watchify/node_modules/browserify/node_modules/process/browser.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/ReactElementValidator.js":[function(require,module,exports){
+(function (process){
 /**
  * Copyright 2014, Facebook, Inc.
  * All rights reserved.
@@ -9815,6 +9829,7 @@ var ReactPropTypeLocations = require("./ReactPropTypeLocations");
 var ReactCurrentOwner = require("./ReactCurrentOwner");
 
 var monitorCodeUse = require("./monitorCodeUse");
+var warning = require("./warning");
 
 /**
  * Warn if there's no key explicitly set on dynamic arrays of children or
@@ -10012,6 +10027,15 @@ function checkPropTypes(componentName, propTypes, props, location) {
 var ReactElementValidator = {
 
   createElement: function(type, props, children) {
+    // We warn in this case but don't throw. We expect the element creation to
+    // succeed and there will likely be errors in render.
+    ("production" !== process.env.NODE_ENV ? warning(
+      type != null,
+      'React.createElement: type should not be null or undefined. It should ' +
+        'be a string (for DOM elements) or a ReactClass (for composite ' +
+        'components).'
+    ) : null);
+
     var element = ReactElement.createElement.apply(this, arguments);
 
     // The result can be nullish if a mock or a custom function is used.
@@ -10024,22 +10048,24 @@ var ReactElementValidator = {
       validateChildKeys(arguments[i], type);
     }
 
-    var name = type.displayName;
-    if (type.propTypes) {
-      checkPropTypes(
-        name,
-        type.propTypes,
-        element.props,
-        ReactPropTypeLocations.prop
-      );
-    }
-    if (type.contextTypes) {
-      checkPropTypes(
-        name,
-        type.contextTypes,
-        element._context,
-        ReactPropTypeLocations.context
-      );
+    if (type) {
+      var name = type.displayName;
+      if (type.propTypes) {
+        checkPropTypes(
+          name,
+          type.propTypes,
+          element.props,
+          ReactPropTypeLocations.prop
+        );
+      }
+      if (type.contextTypes) {
+        checkPropTypes(
+          name,
+          type.contextTypes,
+          element._context,
+          ReactPropTypeLocations.context
+        );
+      }
     }
     return element;
   },
@@ -10057,7 +10083,8 @@ var ReactElementValidator = {
 
 module.exports = ReactElementValidator;
 
-},{"./ReactCurrentOwner":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/ReactCurrentOwner.js","./ReactElement":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/ReactElement.js","./ReactPropTypeLocations":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/ReactPropTypeLocations.js","./monitorCodeUse":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/monitorCodeUse.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/ReactEmptyComponent.js":[function(require,module,exports){
+}).call(this,require('_process'))
+},{"./ReactCurrentOwner":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/ReactCurrentOwner.js","./ReactElement":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/ReactElement.js","./ReactPropTypeLocations":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/ReactPropTypeLocations.js","./monitorCodeUse":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/monitorCodeUse.js","./warning":"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/warning.js","_process":"/usr/local/lib/node_modules/watchify/node_modules/browserify/node_modules/process/browser.js"}],"/Users/giulio/Documents/Projects/github/tcomb-validation/node_modules/react/lib/ReactEmptyComponent.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014, Facebook, Inc.
@@ -12432,7 +12459,7 @@ function createInstanceForTag(tag, props, parentType) {
 
 var ReactNativeComponent = {
   createInstanceForTag: createInstanceForTag,
-  injection: ReactNativeComponentInjection,
+  injection: ReactNativeComponentInjection
 };
 
 module.exports = ReactNativeComponent;
@@ -18396,7 +18423,7 @@ var emptyFunction = require("./emptyFunction");
 var warning = emptyFunction;
 
 if ("production" !== process.env.NODE_ENV) {
-  warning = function(condition, format ) {var args=Array.prototype.slice.call(arguments,2);
+  warning = function(condition, format ) {for (var args=[],$__0=2,$__1=arguments.length;$__0<$__1;$__0++) args.push(arguments[$__0]);
     if (format === undefined) {
       throw new Error(
         '`warning(condition, format, ...args)` requires a warning ' +
@@ -18431,46 +18458,20 @@ module.exports = require('./lib/React');
 
   'use strict';
 
-  var failed = false;
-
-  function onFail(message) {
+  function fail(message) {
     // start debugger only once
-    if (!failed) {
-      /*
-        DEBUG HINT:
-        if you are reading this, chances are that there is a bug in your system
-        see the Call Stack to find out what's wrong..
-      */
+    if (!fail.failed) {
       /*jshint debug: true*/
       debugger;
     }
-    failed = true;
-    throw new Error(message);
+    fail.failed = true;
+    throw new TypeError(message);
   }
 
-  var options = {
-    onFail: onFail
-  };
-
-  function fail(message) {
-    /*
-      DEBUG HINT:
-      if you are reading this, chances are that there is a bug in your system
-      see the Call Stack to find out what's wrong..
-    */
-    options.onFail(message);
-  }
-
-  function assert(guard) {
+  function assert(guard, message) {
     if (guard !== true) {
-      var args = slice.call(arguments, 1);
-      var message = args[0] ? format.apply(null, args) : 'assert failed';
-      /*
-        DEBUG HINT:
-        if you are reading this, chances are that there is a bug in your system
-        see the Call Stack to find out what's wrong..
-      */
-      fail(message);
+      message = message ? format.apply(null, slice.call(arguments, 1)) : 'assert failed';
+      exports.fail(message);
     }
   }
 
@@ -18481,13 +18482,11 @@ module.exports = require('./lib/React');
   var slice = Array.prototype.slice;
 
   function mixin(target, source, overwrite) {
-    if (Nil.is(source)) {
-      return target;
-    }
+    if (Nil.is(source)) { return target; }
     for (var k in source) {
       if (source.hasOwnProperty(k)) {
         if (overwrite !== true) {
-          assert(!target.hasOwnProperty(k), 'cannot overwrite property %s', k);
+          assert(!target.hasOwnProperty(k), 'Cannot overwrite property %s', k);
         }
         target[k] = source[k];
       }
@@ -18516,30 +18515,33 @@ module.exports = require('./lib/React');
     return str;
   }
 
+  function getFunctionName(f) {
+    assert(typeof f === 'function', 'Invalid argument `f` = `%s` supplied to `getFunctionName()`', f);
+    return f.displayName || f.name || format('<function%s>', f.length);
+  }
+
   function replacer(key, value) {
-    if (typeof value === 'function') {
-      return format('Func', value.name);
-    }
-    return value;
+    return Func.is(value) ? getFunctionName(value) : value;
   }
 
   format.formatters = {
-    s: function formatString(x) { return String(x); },
-    j: function formatJSON(x) { return JSON.stringify(x, replacer); }
+    s: function (x) { return String(x); },
+    j: function (x) {
+      try { // handle circular references
+        return JSON.stringify(x, replacer);
+      } catch (e) {
+        return String(x);
+      }
+    }
   };
 
-  function getName(type) {
-    assert(Type.is(type), 'Invalid argument `type` of value `%j` supplied to `getName()`, expected a type.', type);
+  function getTypeName(type) {
+    assert(Type.is(type), 'Invalid argument `type` = `%s` supplied to `getTypeName()`', type);
     return type.meta.name;
   }
 
-  function getKind(type) {
-    assert(Type.is(type), 'Invalid argument `type` of value `%j` supplied to `geKind()`, expected a type.', type);
-    return type.meta.kind;
-  }
-
   function blockNew(x, type) {
-    assert(!(x instanceof type), 'Operator `new` is forbidden for `%s`', getName(type));
+    assert(!(x instanceof type), 'Operator `new` is forbidden for type `%s`', getTypeName(type));
   }
 
   function shallowCopy(x) {
@@ -18563,16 +18565,16 @@ module.exports = require('./lib/React');
   }
 
   update.commands = {
-    '$apply': function $apply(f, value) {
+    '$apply': function (f, value) {
       assert(Func.is(f));
       return f(value);
     },
-    '$push': function $push(elements, arr) {
+    '$push': function (elements, arr) {
       assert(Arr.is(elements));
       assert(Arr.is(arr));
       return arr.concat(elements);
     },
-    '$remove': function $remove(keys, obj) {
+    '$remove': function (keys, obj) {
       assert(Arr.is(keys));
       assert(Obj.is(obj));
       for (var i = 0, len = keys.length ; i < len ; i++ ) {
@@ -18580,18 +18582,18 @@ module.exports = require('./lib/React');
       }
       return obj;
     },
-    '$set': function $set(value) {
+    '$set': function (value) {
       return value;
     },
-    '$splice': function $splice(splices, arr) {
+    '$splice': function (splices, arr) {
       assert(list(Arr).is(splices));
       assert(Arr.is(arr));
-      return splices.reduce(function reducer(acc, splice) {
+      return splices.reduce(function (acc, splice) {
         acc.splice.apply(acc, splice);
         return acc;
       }, arr);
     },
-    '$swap': function $swap(config, arr) {
+    '$swap': function (config, arr) {
       assert(Obj.is(config));
       assert(Num.is(config.from));
       assert(Num.is(config.to));
@@ -18601,136 +18603,116 @@ module.exports = require('./lib/React');
       arr[config.from] = element;
       return arr;
     },
-    '$unshift': function $unshift(elements, arr) {
+    '$unshift': function (elements, arr) {
       assert(Arr.is(elements));
       assert(Arr.is(arr));
       return elements.concat(arr);
+    },
+    '$merge': function (obj, value) {
+      return mixin(mixin({}, value), obj, true);
     }
   };
 
   //
-  // irriducibles
+  // irreducibles
   //
 
-  function irriducible(name, is) {
+  function irreducible(name, is) {
 
-    // DEBUG HINT: if the debugger stops here, the first argument is not a string
-    assert(typeof name === 'string', 'Invalid argument `name` supplied to `irriducible()`');
+    assert(typeof name === 'string', 'Invalid argument `name` = `%s` supplied to `irreducible()`', name);
+    assert(typeof is === 'function', 'Invalid argument `is` = `%s` supplied to `irreducible()`', is);
 
-    // DEBUG HINT: if the debugger stops here, the second argument is not a function
-    assert(typeof is === 'function', 'Invalid argument `is` supplied to `irriducible()`');
-
-    function Irriducible(value) {
-
-      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
-      blockNew(this, Irriducible);
-
-      // DEBUG HINT: if the debugger stops here, the first argument is invalid
-      // mouse over the `value` variable to see what's wrong. In `name` there is the name of the type
-      assert(is(value), 'Invalid `%s` supplied to `%s`', value, name);
-
+    function Irreducible(value) {
+      blockNew(this, Irreducible);
+      assert(is(value), 'Invalid argument `value` = `%s` supplied to irreducible type `%s`', value, name);
       return value;
     }
 
-    Irriducible.meta = {
-      kind: 'irriducible',
+    Irreducible.meta = {
+      kind: 'irreducible',
       name: name
     };
 
-    Irriducible.displayName = name;
+    Irreducible.displayName = name;
 
-    Irriducible.is = is;
+    Irreducible.is = is;
 
-    return Irriducible;
+    return Irreducible;
   }
 
-  var Any = irriducible('Any', function isAny() {
+  var Any = irreducible('Any', function () {
     return true;
   });
 
-  var Nil = irriducible('Nil', function isNil(x) {
+  var Nil = irreducible('Nil', function (x) {
     return x === null || x === void 0;
   });
 
-  var Str = irriducible('Str', function isStr(x) {
+  var Str = irreducible('Str', function (x) {
     return typeof x === 'string';
   });
 
-  var Num = irriducible('Num', function isNum(x) {
+  var Num = irreducible('Num', function (x) {
     return typeof x === 'number' && isFinite(x) && !isNaN(x);
   });
 
-  var Bool = irriducible('Bool', function isBool(x) {
+  var Bool = irreducible('Bool', function (x) {
     return x === true || x === false;
   });
 
-  var Arr = irriducible('Arr', function isArr(x) {
+  var Arr = irreducible('Arr', function (x) {
     return x instanceof Array;
   });
 
-  var Obj = irriducible('Obj', function isObj(x) {
+  var Obj = irreducible('Obj', function (x) {
     return !Nil.is(x) && typeof x === 'object' && !Arr.is(x);
   });
 
-  var Func = irriducible('Func', function isFunc(x) {
+  var Func = irreducible('Func', function (x) {
     return typeof x === 'function';
   });
 
-  var Err = irriducible('Err', function isErr(x) {
+  var Err = irreducible('Err', function (x) {
     return x instanceof Error;
   });
 
-  var Re = irriducible('Re', function isRe(x) {
+  var Re = irreducible('Re', function (x) {
     return x instanceof RegExp;
   });
 
-  var Dat = irriducible('Dat', function isDat(x) {
+  var Dat = irreducible('Dat', function (x) {
     return x instanceof Date;
   });
 
-  var Type = irriducible('Type', function isType(x) {
+  var Type = irreducible('Type', function (x) {
     return Func.is(x) && Obj.is(x.meta);
   });
 
   function struct(props, name) {
 
-    // DEBUG HINT: if the debugger stops here, the first argument is not a dict of types
-    // mouse over the `props` variable to see what's wrong
-    assert(dict(Str, Type).is(props), 'Invalid argument `props` supplied to `struct()`');
-
-    // DEBUG HINT: if the debugger stops here, the second argument is not a string
-    // mouse over the `name` variable to see what's wrong
-    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `struct()`');
-
-    // DEBUG HINT: always give a name to a type, the debug will be easier
-    name = name || 'struct';
+    assert(dict(Str, Type).is(props), 'Invalid argument `props` = `%s` supplied to `struct` combinator', props);
+    assert(maybe(Str).is(name), 'Invalid argument `name` = `%s` supplied to `struct` combinator', name);
+    name = name || format('{%s}', Object.keys(props).map(function (prop) {
+      return format('%s: %s', prop, getTypeName(props[prop]));
+    }).join(', '));
 
     function Struct(value, mut) {
-
       // makes Struct idempotent
       if (Struct.is(value)) {
         return value;
       }
-
-      // DEBUG HINT: if the debugger stops here, the first argument is invalid
-      // mouse over the `value` variable to see what's wrong. In `name` there is the name of the type
-      assert(Obj.is(value), 'Invalid `%s` supplied to `%s`, expected an `Obj`', value, name);
-
+      assert(Obj.is(value), 'Invalid argument `value` = `%s` supplied to struct type `%s`', value, name);
       // makes `new` optional
       if (!(this instanceof Struct)) {
         return new Struct(value, mut);
       }
-
       for (var k in props) {
         if (props.hasOwnProperty(k)) {
           var expected = props[k];
           var actual = value[k];
-          // DEBUG HINT: if the debugger stops here, the `actual` value supplied to the `expected` type is invalid
-          // mouse over the `actual` and `expected` variables to see what's wrong
           this[k] = expected(actual, mut);
         }
       }
-
       if (mut !== true) {
         Object.freeze(this);
       }
@@ -18744,16 +18726,22 @@ module.exports = require('./lib/React');
 
     Struct.displayName = name;
 
-    Struct.is = function isStruct(x) {
+    Struct.is = function (x) {
       return x instanceof Struct;
     };
 
-    Struct.update = function updateStruct(instance, spec, value) {
-      return new Struct(update(instance, spec, value));
+    Struct.update = function (instance, spec) {
+      return new Struct(exports.update(instance, spec));
     };
 
-    Struct.extend = function extendStruct(newProps, name) {
-      return struct([props].concat(newProps).reduce(mixin, {}), name);
+    Struct.extend = function (arr, name) {
+      arr = [].concat(arr).map(function (x) {
+        return Obj.is(x) ? x : x.meta.props;
+      });
+      arr.unshift(props);
+      var ret = struct(arr.reduce(mixin, {}), name);
+      mixin(ret.prototype, Struct.prototype); // prototypal inheritance
+      return ret;
     };
 
     return Struct;
@@ -18761,35 +18749,18 @@ module.exports = require('./lib/React');
 
   function union(types, name) {
 
-    // DEBUG HINT: if the debugger stops here, the first argument is not a list of types
-    assert(list(Type).is(types), 'Invalid argument `types` supplied to `union()`');
-
+    assert(list(Type).is(types), 'Invalid argument `types` = `%s` supplied to `union` combinator', types);
     var len = types.length;
-
-    // DEBUG HINT: if the debugger stops here, there are too few types (they must be at least two)
-    assert(len >= 2, 'Invalid argument `types` supplied to `union()`');
-
-    // DEBUG HINT: if the debugger stops here, the second argument is not a string
-    // mouse over the `name` variable to see what's wrong
-    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `union()`');
-
-    name = name || format('union([%s])', types.map(getName).join(', '));
+    var defaultName = types.map(getTypeName).join(' | ');
+    assert(len >= 2, 'Invalid argument `types` = `%s` supplied to `union` combinator, provide at least two types', defaultName);
+    assert(maybe(Str).is(name), 'Invalid argument `name` = `%s` supplied to `union` combinator', name);
+    name = name || defaultName;
 
     function Union(value, mut) {
-
-      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
       blockNew(this, Union);
-
-      // DEBUG HINT: if the debugger stops here, you must implement the `dispatch` static method for this type
-      assert(Func.is(Union.dispatch), 'unimplemented %s.dispatch()', name);
-
+      assert(Func.is(Union.dispatch), 'Unimplemented `dispatch()` function for union type `%s`', name);
       var type = Union.dispatch(value);
-
-      // DEBUG HINT: if the debugger stops here, the `dispatch` static method returns no type
-      assert(Type.is(type), '%s.dispatch() returns no type', name);
-
-      // DEBUG HINT: if the debugger stops here, `value` can't be converted to `type`
-      // mouse over the `value` and `type` variables to see what's wrong
+      assert(Type.is(type), 'The `dispatch()` function of union type `%s` returns no type constructor', name);
       return type(value, mut);
     }
 
@@ -18801,15 +18772,15 @@ module.exports = require('./lib/React');
 
     Union.displayName = name;
 
-    Union.is = function isUnion(x) {
-      return types.some(function isType(type) {
+    Union.is = function (x) {
+      return types.some(function (type) {
         return type.is(x);
       });
     };
 
     // default dispatch implementation
-    Union.dispatch = function dispatch(x) {
-      for (var i = 0, len = types.length ; i < len ; i++ ) {
+    Union.dispatch = function (x) {
+      for (var i = 0 ; i < len ; i++ ) {
         if (types[i].is(x)) {
           return types[i];
         }
@@ -18821,27 +18792,16 @@ module.exports = require('./lib/React');
 
   function maybe(type, name) {
 
-    // DEBUG HINT: if the debugger stops here, the first argument is not a type
-    assert(Type.is(type), 'Invalid argument `type` supplied to `maybe()`');
-
-    // makes the combinator idempotent
-    if (getKind(type) === 'maybe') {
+    assert(Type.is(type), 'Invalid argument `type` = `%s` supplied to `maybe` combinator', type);
+    // makes the combinator idempotent and handle Any, Nil
+    if (type.meta.kind === 'maybe' || type === Any || type === Nil) {
       return type;
     }
-
-    // DEBUG HINT: if the debugger stops here, the second argument is not a string
-    // mouse over the `name` variable to see what's wrong
-    assert(Nil.is(name) || Str.is(name), 'Invalid argument `name` supplied to `maybe()`');
-
-    name = name || format('maybe(%s)', getName(type));
+    assert(Nil.is(name) || Str.is(name), 'Invalid argument `name` = `%s` supplied to `maybe` combinator', name);
+    name = name || ('?' + getTypeName(type));
 
     function Maybe(value, mut) {
-
-      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
       blockNew(this, Maybe);
-
-      // DEBUG HINT: if the debugger stops here, `value` can't be converted to `type`
-      // mouse over the `value` and `type` variables to see what's wrong
       return Nil.is(value) ? null : type(value, mut);
     }
 
@@ -18853,7 +18813,7 @@ module.exports = require('./lib/React');
 
     Maybe.displayName = name;
 
-    Maybe.is = function isMaybe(x) {
+    Maybe.is = function (x) {
       return Nil.is(x) || type.is(x);
     };
 
@@ -18862,28 +18822,14 @@ module.exports = require('./lib/React');
 
   function enums(map, name) {
 
-    // DEBUG HINT: if the debugger stops here, the first argument is not a hash
-    // mouse over the `map` variable to see what's wrong
-    assert(Obj.is(map), 'Invalid argument `map` supplied to `enums()`');
-
-    // DEBUG HINT: if the debugger stops here, the second argument is not a string
-    // mouse over the `name` variable to see what's wrong
-    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `enums()`');
-
-    name = name || 'enums';
-
-    // cache enums
-    var keys = Object.keys(map);
+    assert(Obj.is(map), 'Invalid argument `map` = `%s` supplied to `enums` combinator', map);
+    assert(maybe(Str).is(name), 'Invalid argument `name` = `%s` supplied to `enums` combinator', name);
+    var keys = Object.keys(map); // cache enums
+    name = name || keys.map(function (k) { return JSON.stringify(k); }).join(' | ');
 
     function Enums(value) {
-
-      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
       blockNew(this, Enums);
-
-      // DEBUG HINT: if the debugger stops here, the value is not one of the defined enums
-      // mouse over the `value`, `name` and `keys` variables to see what's wrong
-      assert(Enums.is(value), 'Invalid `%s` supplied to `%s`, expected one of %j', value, name, keys);
-
+      assert(Enums.is(value), 'Invalid argument `value` = `%s` supplied to enums type `%s`, expected one of %j', value, name, keys);
       return value;
     }
 
@@ -18895,17 +18841,17 @@ module.exports = require('./lib/React');
 
     Enums.displayName = name;
 
-    Enums.is = function isEnums(x) {
+    Enums.is = function (x) {
       return Str.is(x) && map.hasOwnProperty(x);
     };
 
     return Enums;
   }
 
-  enums.of = function enumsOf(keys, name) {
+  enums.of = function (keys, name) {
     keys = Str.is(keys) ? keys.split(' ') : keys;
     var value = {};
-    keys.forEach(function setEnum(k) {
+    keys.forEach(function (k) {
       value[k] = k;
     });
     return enums(value, name);
@@ -18913,38 +18859,31 @@ module.exports = require('./lib/React');
 
   function tuple(types, name) {
 
-    // DEBUG HINT: if the debugger stops here, the first argument is not a list of types
-    assert(list(Type).is(types), 'Invalid argument `types` supplied to `tuple()`');
+    assert(list(Type).is(types), 'Invalid argument `types` = `%s` supplied to `tuple` combinator', types);
+    var len = types.length; // cache types length
+    assert(maybe(Str).is(name), 'Invalid argument `name` = `%s` supplied to `tuple` combinator', name);
+    name = name || format('[%s]', types.map(getTypeName).join(', '));
 
-    var len = types.length;
-
-    // DEBUG HINT: if the debugger stops here, the second argument is not a string
-    // mouse over the `name` variable to see what's wrong
-    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `tuple()`');
-
-    name = name || format('tuple([%s])', types.map(getName).join(', '));
+    function isTuple(x) {
+      return types.every(function (type, i) {
+        return type.is(x[i]);
+      });
+    }
 
     function Tuple(value, mut) {
-
-      // DEBUG HINT: if the debugger stops here, the value is not one of the defined enums
-      // mouse over the `value`, `name` and `len` variables to see what's wrong
-      assert(Arr.is(value) && value.length === len, 'Invalid `%s` supplied to `%s`, expected an `Arr` of length `%s`', value, name, len);
-
+      assert(Arr.is(value) && value.length === len, 'Invalid argument `value` = `%s` supplied to tuple type `%s`, expected an `Arr` of length `%s`', value, name, len);
+      var frozen = (mut !== true);
       // makes Tuple idempotent
-      if (Tuple.isTuple(value)) {
+      if (isTuple(value) && Object.isFrozen(value) === frozen) {
         return value;
       }
-
       var arr = [];
       for (var i = 0 ; i < len ; i++) {
         var expected = types[i];
         var actual = value[i];
-        // DEBUG HINT: if the debugger stops here, the `actual` value supplied to the `expected` type is invalid
-        // mouse over the `actual` and `expected` variables to see what's wrong
         arr.push(expected(actual, mut));
       }
-
-      if (mut !== true) {
+      if (frozen) {
         Object.freeze(arr);
       }
       return arr;
@@ -18959,18 +18898,12 @@ module.exports = require('./lib/React');
 
     Tuple.displayName = name;
 
-    Tuple.isTuple = function isTuple(x) {
-      return types.every(function isType(type, i) {
-        return type.is(x[i]);
-      });
+    Tuple.is = function (x) {
+      return Arr.is(x) && x.length === len && isTuple(x);
     };
 
-    Tuple.is = function isTuple(x) {
-      return Arr.is(x) && x.length === len && Tuple.isTuple(x);
-    };
-
-    Tuple.update = function updateTuple(instance, spec, value) {
-      return Tuple(update(instance, spec, value));
+    Tuple.update = function (instance, spec) {
+      return Tuple(exports.update(instance, spec));
     };
 
     return Tuple;
@@ -18978,33 +18911,15 @@ module.exports = require('./lib/React');
 
   function subtype(type, predicate, name) {
 
-    // DEBUG HINT: if the debugger stops here, the first argument is not a type
-    assert(Type.is(type), 'Invalid argument `type` supplied to `subtype()`');
-
-    // DEBUG HINT: if the debugger stops here, the second argument is not a function
-    assert(Func.is(predicate), 'Invalid argument `predicate` supplied to `subtype()`');
-
-    // DEBUG HINT: if the debugger stops here, the third argument is not a string
-    // mouse over the `name` variable to see what's wrong
-    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `subtype()`');
-
-    // DEBUG HINT: always give a name to a type, the debug will be easier
-    name = name || format('subtype(%s)', getName(type));
-
-    // cache expected value
-    var expected = predicate.__doc__ || format('insert a valid value for %s', predicate.name || 'the subtype');
+    assert(Type.is(type), 'Invalid argument `type` = `%s` supplied to `subtype` combinator', type);
+    assert(Func.is(predicate), 'Invalid argument `predicate` = `%s` supplied to `subtype` combinator', predicate);
+    assert(maybe(Str).is(name), 'Invalid argument `name` = `%s` supplied to `subtype` combinator', name);
+    name = name || format('{%s | %s}', getTypeName(type), getFunctionName(predicate));
 
     function Subtype(value, mut) {
-
-      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
       blockNew(this, Subtype);
-
-      // DEBUG HINT: if the debugger stops here, the value cannot be converted to the base type
       var x = type(value, mut);
-
-      // DEBUG HINT: if the debugger stops here, the value is converted to the base type
-      // but the predicate returns `false`
-      assert(predicate(x), 'Invalid `%s` supplied to `%s`, %s', value, name, expected);
+      assert(predicate(x), 'Invalid argument `value` = `%s` supplied to subtype type `%s`', value, name);
       return x;
     }
 
@@ -19017,12 +18932,12 @@ module.exports = require('./lib/React');
 
     Subtype.displayName = name;
 
-    Subtype.is = function isSubtype(x) {
+    Subtype.is = function (x) {
       return type.is(x) && predicate(x);
     };
 
-    Subtype.update = function updateSubtype(instance, spec, value) {
-      return Subtype(update(instance, spec, value));
+    Subtype.update = function (instance, spec) {
+      return Subtype(exports.update(instance, spec));
     };
 
     return Subtype;
@@ -19030,38 +18945,27 @@ module.exports = require('./lib/React');
 
   function list(type, name) {
 
-    // DEBUG HINT: if the debugger stops here, the first argument is not a type
-    assert(Type.is(type), 'Invalid argument `type` supplied to `list()`');
+    assert(Type.is(type), 'Invalid argument `type` = `%s` supplied to `list` combinator', type);
+    assert(maybe(Str).is(name), 'Invalid argument `name` = `%s` supplied to `list` combinator', name);
+    name = name || format('Array<%s>', getTypeName(type));
 
-    // DEBUG HINT: if the debugger stops here, the third argument is not a string
-    // mouse over the `name` variable to see what's wrong
-    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `list()`');
-
-    // DEBUG HINT: always give a name to a type, the debug will be easier
-    name = name || format('list(%s)', getName(type));
+    function isList(x) {
+      return x.every(type.is);
+    }
 
     function List(value, mut) {
-
-      // DEBUG HINT: if the debugger stops here, you have used the `new` operator but it's forbidden
-
-      // DEBUG HINT: if the debugger stops here, the value is not one of the defined enums
-      // mouse over the `value` and `name` variables to see what's wrong
-      assert(Arr.is(value), 'Invalid `%s` supplied to `%s`, expected an `Arr`', value, name);
-
+      assert(Arr.is(value), 'Invalid argument `value` = `%s` supplied to list type `%s`', value, name);
+      var frozen = (mut !== true);
       // makes List idempotent
-      if (List.isList(value)) {
+      if (isList(value) && Object.isFrozen(value) === frozen) {
         return value;
       }
-
       var arr = [];
       for (var i = 0, len = value.length ; i < len ; i++ ) {
         var actual = value[i];
-        // DEBUG HINT: if the debugger stops here, the `actual` value supplied to the `type` type is invalid
-        // mouse over the `actual` and `type` variables to see what's wrong
         arr.push(type(actual, mut));
       }
-
-      if (mut !== true) {
+      if (frozen) {
         Object.freeze(arr);
       }
       return arr;
@@ -19075,16 +18979,12 @@ module.exports = require('./lib/React');
 
     List.displayName = name;
 
-    List.isList = function isList(x) {
-      return x.every(type.is);
+    List.is = function (x) {
+      return Arr.is(x) && isList(x);
     };
 
-    List.is = function isList(x) {
-      return Arr.is(x) && List.isList(x);
-    };
-
-    List.update = function updateList(instance, spec, value) {
-      return List(update(instance, spec, value));
+    List.update = function (instance, spec) {
+      return List(exports.update(instance, spec));
     };
 
     return List;
@@ -19092,44 +18992,36 @@ module.exports = require('./lib/React');
 
   function dict(domain, codomain, name) {
 
-    // DEBUG HINT: if the debugger stops here, the first argument is not a type
-    assert(Type.is(domain), 'Invalid argument `domain` supplied to `dict()`');
+    assert(Type.is(domain), 'Invalid argument `domain` = `%s` supplied to `dict` combinator', domain);
+    assert(Type.is(codomain), 'Invalid argument `codomain` = `%s` supplied to `dict` combinator', codomain);
+    assert(maybe(Str).is(name), 'Invalid argument `name` = `%s` supplied to `dict` combinator', name);
+    name = name || format('{[key:%s]: %s}', getTypeName(domain), getTypeName(codomain));
 
-    // DEBUG HINT: if the debugger stops here, the second argument is not a type
-    assert(Type.is(codomain), 'Invalid argument `codomain` supplied to `dict()`');
-
-    // DEBUG HINT: if the debugger stops here, the third argument is not a string
-    // mouse over the `name` variable to see what's wrong
-    assert(maybe(Str).is(name), 'Invalid argument `name` supplied to `dict()`');
-
-    // DEBUG HINT: always give a name to a type, the debug will be easier
-    name = name || format('dict(%s, %s)', getName(domain), getName(codomain));
+    function isDict(x) {
+      for (var k in x) {
+        if (x.hasOwnProperty(k)) {
+          if (!domain.is(k) || !codomain.is(x[k])) { return false; }
+        }
+      }
+      return true;
+    }
 
     function Dict(value, mut) {
-
-      // DEBUG HINT: if the debugger stops here, the value is not an object
-      // mouse over the `value` and `name` variables to see what's wrong
-      assert(Obj.is(value), 'Invalid `%s` supplied to `%s`, expected an `Obj`', value, name);
-
+      assert(Obj.is(value), 'Invalid argument `value` = `%s` supplied to dict type `%s`', value, name);
+      var frozen = (mut !== true);
       // makes Dict idempotent
-      if (Dict.isDict(value)) {
+      if (isDict(value) && Object.isFrozen(value) === frozen) {
         return value;
       }
-
       var obj = {};
       for (var k in value) {
         if (value.hasOwnProperty(k)) {
-          // DEBUG HINT: if the debugger stops here, the `k` value supplied to the `domain` type is invalid
-          // mouse over the `k` and `domain` variables to see what's wrong
           k = domain(k);
           var actual = value[k];
-          // DEBUG HINT: if the debugger stops here, the `actual` value supplied to the `codomain` type is invalid
-          // mouse over the `actual` and `codomain` variables to see what's wrong
           obj[k] = codomain(actual, mut);
         }
       }
-
-      if (mut !== true) {
+      if (frozen) {
         Object.freeze(obj);
       }
       return obj;
@@ -19144,55 +19036,37 @@ module.exports = require('./lib/React');
 
     Dict.displayName = name;
 
-    Dict.isDict = function isDict(x) {
-      for (var k in x) {
-        if (x.hasOwnProperty(k)) {
-          if (!domain.is(k) || !codomain.is(x[k])) { return false; }
-        }
-      }
-      return true;
+    Dict.is = function (x) {
+      return Obj.is(x) && isDict(x);
     };
 
-    Dict.is = function isDict(x) {
-      return Obj.is(x) && Dict.isDict(x);
-    };
-
-
-    Dict.update = function updateDict(instance, spec, value) {
-      return Dict(update(instance, spec, value));
+    Dict.update = function (instance, spec) {
+      return Dict(exports.update(instance, spec));
     };
 
     return Dict;
+  }
+
+  function isInstrumented(f) {
+    return Func.is(f) && Obj.is(f.type);
   }
 
   function func(domain, codomain, name) {
 
     // handle handy syntax for unary functions
     domain = Arr.is(domain) ? domain : [domain];
-
-    // DEBUG HINT: if the debugger stops here, the first argument is not a list of types
-    assert(list(Type).is(domain), 'Invalid argument `domain` supplied to `func()`');
-
-    // DEBUG HINT: if the debugger stops here, the second argument is not a type
-    assert(Type.is(codomain), 'Invalid argument `codomain` supplied to `func()`');
-
-    // DEBUG HINT: always give a name to a type, the debug will be easier
-    name = name || format('func([%s], %s)', domain.map(getName).join(', '), getName(codomain));
-
-    // cache the domain length
-    var domainLen = domain.length;
+    assert(list(Type).is(domain), 'Invalid argument `domain` = `%s` supplied to `func` combinator', domain);
+    assert(Type.is(codomain), 'Invalid argument `codomain` = `%s` supplied to `func` combinator', codomain);
+    assert(maybe(Str).is(name), 'Invalid argument `name` = `%s` supplied to `func` combinator', name);
+    name = name || format('(%s) => %s', domain.map(getTypeName).join(', '), getTypeName(codomain));
+    var domainLen = domain.length; // cache the domain length
 
     function Func(value) {
-
-      // automatically instrument the function if is not already instrumented
-      if (!func.is(value)) {
-        value = Func.of(value);
+      // automatically instrument the function
+      if (!isInstrumented(value)) {
+        return Func.of(value);
       }
-
-      // DEBUG HINT: if the debugger stops here, the first argument is invalid
-      // mouse over the `value` and `name` variables to see what's wrong
-      assert(Func.is(value), 'Invalid `%s` supplied to `%s`', value, name);
-
+      assert(Func.is(value), 'Invalid argument `value` = `%s` supplied to func type `%s`', value, name);
       return value;
     }
 
@@ -19205,18 +19079,17 @@ module.exports = require('./lib/React');
 
     Func.displayName = name;
 
-    Func.is = function isFunc(x) {
-      return func.is(x) &&
-        x.func.domain.length === domain.length &&
-        x.func.domain.every(function isEqual(type, i) {
+    Func.is = function (x) {
+      return isInstrumented(x) &&
+        x.type.domain.length === domainLen &&
+        x.type.domain.every(function (type, i) {
           return type === domain[i];
         }) &&
-        x.func.codomain === codomain;
+        x.type.codomain === codomain;
     };
 
-    Func.of = function funcOf(f) {
+    Func.of = function (f) {
 
-      // DEBUG HINT: if the debugger stops here, f is not a function
       assert(typeof f === 'function');
 
       // makes Func.of idempotent
@@ -19225,40 +19098,27 @@ module.exports = require('./lib/React');
       }
 
       function fn() {
-
         var args = slice.call(arguments);
-        var len = Math.min(args.length, domainLen);
-
-        // DEBUG HINT: if the debugger stops here, you provided wrong arguments to the function
-        // mouse over the `args` variable to see what's wrong
-        args = tuple(domain.slice(0, len))(args);
-
+        var len = args.length;
+        var argsType = tuple(domain.slice(0, len));
+        args = argsType(args);
         if (len === domainLen) {
-
           /* jshint validthis: true */
-          var r = f.apply(this, args);
-
-          // DEBUG HINT: if the debugger stops here, the return value of the function is invalid
-          // mouse over the `r` variable to see what's wrong
-          r = codomain(r);
-
-          return r;
-
+          return codomain(f.apply(this, args));
         } else {
-
           var curried = Function.prototype.bind.apply(f, [this].concat(args));
           var newdomain = func(domain.slice(len), codomain);
           return newdomain.of(curried);
-
         }
-
       }
 
-      fn.func = {
+      fn.type = {
         domain: domain,
         codomain: codomain,
         f: f
       };
+
+      fn.displayName = getFunctionName(f);
 
       return fn;
 
@@ -19268,27 +19128,16 @@ module.exports = require('./lib/React');
 
   }
 
-  // returns true if x is an instrumented function
-  func.is = function isFunc(f) {
-    return Func.is(f) && Obj.is(f.func);
-  };
-
-  return {
-
-    util: {
-      mixin: mixin,
-      format: format,
-      getName: getName,
-      getKind: getKind,
-      slice: slice,
-      shallowCopy: shallowCopy,
-      update: update
-    },
-
-    options: options,
+  var exports = {
+    format: format,
+    getFunctionName: getFunctionName,
+    getTypeName: getTypeName,
+    mixin: mixin,
+    slice: slice,
+    shallowCopy: shallowCopy,
+    update: update,
     assert: assert,
     fail: fail,
-
     Any: Any,
     Nil: Nil,
     Str: Str,
@@ -19301,8 +19150,7 @@ module.exports = require('./lib/React');
     Re: Re,
     Dat: Dat,
     Type: Type,
-
-    irriducible: irriducible,
+    irreducible: irreducible,
     struct: struct,
     enums: enums,
     union: union,
@@ -19313,6 +19161,9 @@ module.exports = require('./lib/React');
     dict: dict,
     func: func
   };
+
+  return exports;
+
 }));
 
 },{}],"/Users/giulio/Documents/Projects/github/tcomb-validation/playground/playground.jsx":[function(require,module,exports){
@@ -19341,7 +19192,7 @@ function repo(name, title) {
 var isDebuggerEnabled = false;
 
 // override default fail behaviour of tcomb https://github.com/gcanti/tcomb
-t.options.onFail = function (message) {
+t.fail = function (message) {
   if (isDebuggerEnabled) {
     debugger;
   }
@@ -19495,17 +19346,17 @@ var Validation = React.createClass({displayName: 'Validation',
         )
       );
     } else {
-      validation = results.map(function (result) {
+      validation = results.map(function (result, i) {
         if (result.isValid()) {
           return (
-            React.createElement("div", {className: "alert alert-success"}, 
+            React.createElement("div", {className: "alert alert-success", key: i}, 
               "ok"
             )
           );
         } else {
           return result.errors.map(function (e, i) {
             return (
-              React.createElement("div", {className: "alert alert-danger"}, 
+              React.createElement("div", {className: "alert alert-danger", key: i}, 
                 e.message
               )
             );
@@ -19635,7 +19486,7 @@ var Main = React.createClass({displayName: 'Main',
 // run
 //
 
-var main = React.renderComponent(Main(null), document.getElementById('app'));
+var main = React.render(React.createFactory(Main)(null), document.getElementById('app'));
 
 
 });
@@ -19649,6 +19500,8 @@ var process = module.exports = {};
 process.nextTick = (function () {
     var canSetImmediate = typeof window !== 'undefined'
     && window.setImmediate;
+    var canMutationObserver = typeof window !== 'undefined'
+    && window.MutationObserver;
     var canPost = typeof window !== 'undefined'
     && window.postMessage && window.addEventListener
     ;
@@ -19657,8 +19510,29 @@ process.nextTick = (function () {
         return function (f) { return window.setImmediate(f) };
     }
 
+    var queue = [];
+
+    if (canMutationObserver) {
+        var hiddenDiv = document.createElement("div");
+        var observer = new MutationObserver(function () {
+            var queueList = queue.slice();
+            queue.length = 0;
+            queueList.forEach(function (fn) {
+                fn();
+            });
+        });
+
+        observer.observe(hiddenDiv, { attributes: true });
+
+        return function nextTick(fn) {
+            if (!queue.length) {
+                hiddenDiv.setAttribute('yes', 'no');
+            }
+            queue.push(fn);
+        };
+    }
+
     if (canPost) {
-        var queue = [];
         window.addEventListener('message', function (ev) {
             var source = ev.source;
             if ((source === window || source === null) && ev.data === 'process-tick') {
@@ -19698,7 +19572,7 @@ process.emit = noop;
 
 process.binding = function (name) {
     throw new Error('process.binding is not supported');
-}
+};
 
 // TODO(shtylman)
 process.cwd = function () { return '/' };

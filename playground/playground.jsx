@@ -23,7 +23,7 @@ function repo(name, title) {
 var isDebuggerEnabled = false;
 
 // override default fail behaviour of tcomb https://github.com/gcanti/tcomb
-t.options.onFail = function (message) {
+t.fail = function (message) {
   if (isDebuggerEnabled) {
     debugger;
   }
@@ -177,17 +177,17 @@ var Validation = React.createClass({
         </div>
       );
     } else {
-      validation = results.map(function (result) {
+      validation = results.map(function (result, i) {
         if (result.isValid()) {
           return (
-            <div className="alert alert-success">
+            <div className="alert alert-success" key={i}>
               ok
             </div>
           );
         } else {
           return result.errors.map(function (e, i) {
             return (
-              <div className="alert alert-danger">
+              <div className="alert alert-danger" key={i}>
                 {e.message}
               </div>
             );
@@ -317,7 +317,7 @@ var Main = React.createClass({
 // run
 //
 
-var main = React.renderComponent(Main(null), document.getElementById('app'));
+var main = React.render(React.createFactory(Main)(null), document.getElementById('app'));
 
 
 });
