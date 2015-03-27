@@ -1,3 +1,11 @@
+v1.0.2
+
+- react-native compatibility, fix #11
+
+v1.0.1
+
+- fix #10
+
 v1.0
 
 - update to tcomb v1.0
