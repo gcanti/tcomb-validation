@@ -134,4 +134,8 @@ describe('validate()', function () {
     eq(validate(true, Union), failure(true, Union, [], '/ is `true` should be a `Union`', true));
   });
 
+  it('optional `path` param', function () {
+    eq(validate(1, Str, ['prefix']), failure(1, Str, ['prefix'], '/prefix is `1` should be a `Str`', 1));
+  });
+
 });

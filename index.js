@@ -68,8 +68,8 @@
   // validate
   //
 
-  function validate(x, type) {
-    return new ValidationResult(recurse(x, type, []));
+  function validate(x, type, path) {
+    return new ValidationResult(recurse(x, type, path || []));
   }
 
   function recurse(x, type, path) {

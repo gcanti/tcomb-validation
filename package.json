@@ -1,6 +1,6 @@
 {
   "name": "tcomb-validation",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "General purpose validation library for JavaScript",
   "main": "index.js",
   "scripts": {

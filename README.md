@@ -38,11 +38,12 @@ Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/
 The main function is `validate`:
 
 ```js
-validate(value, type) -> ValidationResult
+validate(value, type, [path]) -> ValidationResult
 ```
 
 - `value` the value to validate
 - `type` a type defined with the [tcomb](https://github.com/gcanti/tcomb) library
+- `path` (optional array) provides a prefix to error paths
 
 returns a `ValidationResult` object containing the result of the validation
 

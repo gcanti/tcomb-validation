@@ -1,3 +1,7 @@
+v1.0.3
+
+- added an optional `path` param to `validate` in order to provide a prefix to error paths, fix #13
+
 v1.0.2
 
 - react-native compatibility, fix #11
