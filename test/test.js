@@ -134,6 +134,13 @@ describe('validate()', function () {
     eq(validate(true, Union), failure(true, Union, [], '/ is `true` should be a `Union`', true));
   });
 
+  it('union of structs', function () {
+    var Union = t.union([t.struct({one: Str}), t.struct({two: Num})], 'Union');
+    eq(validate({one: 'val'}, Union), success({one: 'val'}));
+    eq(validate({two: 3}, Union), success({two: 3}));
+    eq(validate({one: 2}, Union), failure({one: 2}, Union, [], '/ is `{"one":2}` should be a `Union`', {one: 2}));
+  });
+
   it('optional `path` param', function () {
     eq(validate(1, Str, ['prefix']), failure(1, Str, ['prefix'], '/prefix is `1` should be a `Str`', 1));
   });
