@@ -198,7 +198,13 @@
   };
 
   validators.union = function validateUnion(x, type, path) {
-    var ctor = type.dispatch(x);
+    var ctor = false
+    for (var i=0; i<type.meta.types.length; i++) {
+      if (recurse(x, type.meta.types[i], path).errors.length === 0) {
+        ctor = type.meta.types[i]
+        break
+      }
+    }
     return t.Func.is(ctor)?
       recurse(x, ctor, path.concat(type.meta.types.indexOf(ctor))) :
       {value: x, errors: [ValidationError.of(x, type, path)]};
