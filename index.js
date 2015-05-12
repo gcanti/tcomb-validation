@@ -187,9 +187,9 @@
     // every value should be of type `codomain`
     for (var k in x) {
       if (x.hasOwnProperty(k)) {
-        path = path.concat(k);
-        var key = recurse(k, type.meta.domain, path);
-        var item = recurse(x[k], type.meta.codomain, path);
+        var subpath = path.concat(k);
+        var key = recurse(k, type.meta.domain, subpath);
+        var item = recurse(x[k], type.meta.codomain, subpath);
         ret.value[k] = item.value;
         ret.errors = ret.errors.concat(key.errors, item.errors);
       }

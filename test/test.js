@@ -125,6 +125,8 @@ describe('validate()', function () {
     eq(validate({a: {x: 0, y: 0}}, Dict), failure('a', Key, ['a'], '/a is `"a"` should be a `Key`', {a: {x: 0, y: 0}}));
     ok(validate({a: {x: 0, y: 0}}, Dict).value.a instanceof Point);
     eq(validate({aa: {x: 0, y: 'a'}}, Dict), failure('a', Num, ['aa', 'y'], '/aa/y is `"a"` should be a `Num`', {aa: {x: 0, y: 'a'}}));
+    Dict = t.dict(Str, Str);
+    eq(validate({a: "a", b: 0}, Dict), failure(0, Str, ['b'], '/b is `0` should be a `Str`', {a: "a", b: 0}));
   });
 
   it('union', function () {
