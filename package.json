@@ -18,7 +18,7 @@
   },
   "homepage": "https://github.com/gcanti/tcomb-validation",
   "dependencies": {
-    "tcomb": "git://github.com/gcanti/tcomb"
+    "tcomb": "^2.0.0-beta"
   },
   "devDependencies": {
     "eslint": "^0.22.1",
