@@ -1,12 +1,13 @@
+[![build status](https://img.shields.io/travis/gcanti/tcomb-validation/master.svg?style=flat-square)](https://travis-ci.org/gcanti/tcomb-validation)
+[![dependency status](https://img.shields.io/david/gcanti/tcomb-validation.svg?style=flat-square)](https://david-dm.org/gcanti/tcomb-validation)
+
 A general purpose JavaScript validation library based on type combinators
 
 # Playground
 
 Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/playground/playground.html)
 
-# Overview
-
-**Features**
+# Features
 
 - concise yet expressive syntax
 - validates native types, subtypes, objects, lists and tuples, enums, unions, dicts
@@ -15,7 +16,7 @@ Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/
 - lightweight alternative to JSON Schema
 - reuse your domain model written with [tcomb](https://github.com/gcanti/tcomb)
 
-**Contents**
+# Documentation
 
 - [Basic usage](#basic-usage)
   - [Primitives](#primitives)

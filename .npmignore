@@ -1,10 +1,4 @@
 .*
 *.log
-bower.json
-Gruntfile.js
 node_modules
 test
-coverage
-dev
-playground
-examples
