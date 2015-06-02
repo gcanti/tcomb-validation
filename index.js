@@ -9,8 +9,16 @@ var ValidationError = t.struct({
   path: t.list(t.union([t.Str, t.Num]))
 }, 'ValidationError');
 
+function stringify(x) {
+  try { // handle "Converting circular structure to JSON" error
+    return JSON.stringify(x);
+  } catch (e) {
+    return String(x);
+  }
+}
+
 function getDefaultMessage(actual, expected, path) {
-  return '/' + path.join('/') + ' is ' + JSON.stringify(actual) + ' should be a ' + t.getTypeName(expected);
+  return '/' + path.join('/') + ' is ' + stringify(actual) + ' should be a ' + t.getTypeName(expected);
 }
 
 ValidationError.of = function of(actual, expected, path) {
@@ -37,7 +45,7 @@ ValidationResult.prototype.firstError = function firstError() {
 
 ValidationResult.prototype.toString = function toString() {
   return this.isValid() ?
-    '[ValidationResult, true, ' + JSON.stringify(this.value) + ']' :
+    '[ValidationResult, true, ' + stringify(this.value) + ']' :
     '[ValidationResult, false, (' + this.errors.map(function errorToString(err) {
       return err.message;
     }).join(', ') + ')]';
