@@ -1,5 +1,6 @@
 [![build status](https://img.shields.io/travis/gcanti/tcomb-validation/master.svg?style=flat-square)](https://travis-ci.org/gcanti/tcomb-validation)
 [![dependency status](https://img.shields.io/david/gcanti/tcomb-validation.svg?style=flat-square)](https://david-dm.org/gcanti/tcomb-validation)
+![npm downloads](https://img.shields.io/npm/dm/tcomb-validation.svg)
 
 A general purpose JavaScript validation library based on type combinators
 
