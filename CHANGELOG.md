@@ -10,11 +10,17 @@
 
 **Note**: Gaps between patch versions are faulty/broken releases.
 
+## v2.0.1
+
+- **Internal**
+  - upgrade to tcomb v2.1
+  - updated tests accordingly
+
 ## v2.0.0
 
 - **Breaking change**
   - upgrade to tcomb v2.0 #17
-  - drop bower support #18 
+  - drop bower support #18
 
 ## v1.0.4
 
