@@ -197,6 +197,20 @@ validators.union = function validateUnion(x, type, path) {
     {value: x, errors: [ValidationError.of(x, type, path)]};
 };
 
+validators.intersection = function validateIntersection(x, type, path) {
+
+  var types = type.meta.types;
+  var len = types.length;
+
+  var ret = {value: x, errors: []};
+  // x should be of type `types[i]` for all i
+  for (var i = 0; i < len; i++) {
+    var item = recurse(x, types[i], path);
+    ret.errors = ret.errors.concat(item.errors);
+  }
+  return ret;
+};
+
 t.mixin(t, {
   ValidationError: ValidationError,
   ValidationResult: ValidationResult,

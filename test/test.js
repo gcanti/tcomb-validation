@@ -149,4 +149,70 @@ describe('validate()', function () {
     eq(validate(1, Class), failure(1, Class, [], '/ is 1 should be a Class', 1));
   });
 
+  it('intersection', function () {
+    var Min = t.subtype(t.String, function (s) { return s.length > 2; }, 'Min');
+    var Max = t.subtype(t.String, function (s) { return s.length < 5; }, 'Max');
+    var MinMax = t.intersection([Min, Max], 'MinMax');
+
+    eq(validate(1, MinMax), {
+      errors: [
+        {
+          message: '/ is 1 should be a String',
+          actual: 1,
+          expected: Str,
+          path: []
+        },
+        {
+          message: '/ is 1 should be a String',
+          actual: 1,
+          expected: Str,
+          path: []
+        }
+      ],
+      value: 1
+    });
+
+    eq(validate('aa', MinMax), {
+      errors: [
+        {
+          message: '/ is "aa" should be a Min',
+          actual: 'aa',
+          expected: Min,
+          path: []
+        }
+      ],
+      value: 'aa'
+    });
+
+    eq(validate('aaaaa', MinMax), {
+      errors: [
+        {
+          message: '/ is "aaaaa" should be a Max',
+          actual: 'aaaaa',
+          expected: Max,
+          path: []
+        }
+      ],
+      value: 'aaaaa'
+    });
+
+    eq(validate('aaa', MinMax), {
+      errors: [],
+      value: 'aaa'
+    });
+
+    eq(validate({name: 'aa'}, t.struct({name: MinMax})), {
+      errors: [
+        {
+          message: '/name is "aa" should be a Min',
+          actual: 'aa',
+          expected: Min,
+          path: ['name']
+        }
+      ],
+      value: {name: 'aa'}
+    });
+
+  });
+
 });

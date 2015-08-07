@@ -10,6 +10,11 @@
 
 **Note**: Gaps between patch versions are faulty/broken releases.
 
+## v2.1.0
+
+- **New Feature**
+  - upgrade to tcomb v2.2, added validation of `intersection` types
+
 ## v2.0.1
 
 - **Internal**
