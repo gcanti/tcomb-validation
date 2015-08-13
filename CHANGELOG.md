@@ -13,7 +13,9 @@
 ## v2.1.0
 
 - **New Feature**
-  - upgrade to tcomb v2.2, added validation of `intersection` types
+  - upgrade to tcomb v2.2
+    - validation of `intersection` types
+    - error messages are formatted accordingly
 
 ## v2.0.1
 
