@@ -1,6 +1,7 @@
 'use strict';
 
 var t = require('tcomb');
+var stringify = t.stringify;
 
 var ValidationError = t.struct({
   message: t.Str,
@@ -9,16 +10,10 @@ var ValidationError = t.struct({
   path: t.list(t.union([t.Str, t.Num]))
 }, 'ValidationError');
 
-function stringify(x) {
-  try { // handle "Converting circular structure to JSON" error
-    return JSON.stringify(x);
-  } catch (e) {
-    return String(x);
-  }
-}
-
 function getDefaultMessage(actual, expected, path) {
-  return '/' + path.join('/') + ' is ' + stringify(actual) + ' should be a ' + t.getTypeName(expected);
+  var expectedName = t.getTypeName(expected);
+  var to = path.length ? '/' + path.join('/') + ': ' + expectedName : expectedName;
+  return 'Invalid value ' + stringify(actual) + ' supplied to ' + to;
 }
 
 ValidationError.of = function of(actual, expected, path) {
