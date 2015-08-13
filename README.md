@@ -4,14 +4,10 @@
 
 A general purpose JavaScript validation library based on type combinators
 
-# Playground
-
-Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/playground/playground.html)
-
 # Features
 
 - concise yet expressive syntax
-- validates native types, subtypes, objects, lists and tuples, enums, unions, dicts
+- validates native types, subtypes, objects, lists and tuples, enums, unions, dicts, intersections
 - validates structures with arbitrary level of nesting
 - detailed informations on failed validations
 - lightweight alternative to JSON Schema
@@ -27,6 +23,7 @@ Try the [playground online](https://gcanti.github.io/resources/tcomb-validation/
   - [Enums](#enums)
   - [Unions](#unions)
   - [Dicts](#dicts)
+  - [Intersections](#intersections)
   - [Nested structures](#nested-structures)
 - [Use cases](#use-cases)
   - [Form validation](#form-validation)
@@ -54,18 +51,17 @@ Example
 ```js
 var t = require('tcomb-validation');
 var validate = t.validate;
-var Str = t.Str; // a string type
 
-validate(1, Str).isValid();   // => false
-validate('a', Str).isValid(); // => true
+validate(1, t.String).isValid();   // => false
+validate('a', t.String).isValid(); // => true
 ```
 
 You can inspect the result to quickly identify what's wrong:
 
 ```js
-var result = validate(1, Str);
+var result = validate(1, t.String);
 result.isValid();     // => false
-result.firstError();  // => 'value is `1`, should be a `Str`'
+result.firstError();  // => 'Invalid value 1 supplied to String'
 
 // see `result.errors` to inspect all errors
 ```
@@ -74,38 +70,38 @@ result.firstError();  // => 'value is `1`, should be a `Str`'
 
 ```js
 // null and undefined
-validate('a', Nil).isValid();       // => false
-validate(null, Nil).isValid();      // => true
-validate(undefined, Nil).isValid(); // => true
+validate('a', t.Nil).isValid();       // => false
+validate(null, t.Nil).isValid();      // => true
+validate(undefined, t.Nil).isValid(); // => true
 
 // strings
-validate(1, Str).isValid();   // => false
-validate('a', Str).isValid(); // => true
+validate(1, t.String).isValid();   // => false
+validate('a', t.String).isValid(); // => true
 
 // numbers
-validate('a', Num).isValid(); // => false
-validate(1, Num).isValid();   // => true
+validate('a', t.Number).isValid(); // => false
+validate(1, t.Number).isValid();   // => true
 
 // booleans
-validate(1, Bool).isValid();    // => false
-validate(true, Bool).isValid(); // => true
+validate(1, t.Boolean).isValid();    // => false
+validate(true, t.Boolean).isValid(); // => true
 
 // optional values
-validate(null, maybe(Str)).isValid(); // => true
-validate('a', maybe(Str)).isValid();  // => true
-validate(1, maybe(Str)).isValid();    // => false
+validate(null, maybe(t.String)).isValid(); // => true
+validate('a', maybe(t.String)).isValid();  // => true
+validate(1, maybe(t.String)).isValid();    // => false
 
 // functions
-validate(1, Func).isValid();              // => false
-validate(function () {}, Func).isValid(); // => true
+validate(1, t.Function).isValid();              // => false
+validate(function () {}, t.Function).isValid(); // => true
 
 // dates
-validate(1, Dat).isValid();           // => false
-validate(new Date(), Dat).isValid();  // => true
+validate(1, t.Date).isValid();           // => false
+validate(new Date(), t.Date).isValid();  // => true
 
 // regexps
-validate(1, Re).isValid();    // => false
-validate(/^a/, Re).isValid(); // => true
+validate(1, t.RegExp).isValid();    // => false
+validate(/^a/, t.RegExp).isValid(); // => true
 ```
 
 ## Subtypes
@@ -117,7 +113,7 @@ You can express more fine-grained contraints with the `subtype` syntax:
 var predicate = function (x) { return x >= 0; };
 
 // a positive number
-var Positive = subtype(Num, predicate);
+var Positive = t.subtype(t.Number, predicate);
 
 validate(-1, Positive).isValid(); // => false
 validate(1, Positive).isValid();  // => true
@@ -127,9 +123,9 @@ validate(1, Positive).isValid();  // => true
 
 ```js
 // an object with two numerical properties
-var Point = struct({
-  x: Num,
-  y: Num
+var Point = t.struct({
+  x: t.Number,
+  y: t.Number
 });
 
 validate(null, Point).isValid();            // => false
@@ -145,7 +141,7 @@ validate({x: 0, y: 0}, Point).isValid();    // => true
 
 ```js
 // a list of strings
-var Words = list(Str);
+var Words = t.list(t.String);
 
 validate(null, Words).isValid();                  // => false
 validate(['hello', 1], Words).isValid();          // => false, [1] is not a string
@@ -156,7 +152,7 @@ validate(['hello', 'world'], Words).isValid();    // => true
 
 ```js
 // a tuple (width x height)
-var Size = tuple([Positive, Positive]);
+var Size = t.tuple([Positive, Positive]);
 
 validate([1], Size).isValid();      // => false, height missing
 validate([1, -1], Size).isValid();  // => false, bad height
@@ -166,7 +162,7 @@ validate([1, 2], Size).isValid();   // => true
 ## Enums
 
 ```js
-var CssTextAlign = enums.of('left right center justify');
+var CssTextAlign = t.enums.of('left right center justify');
 
 validate('bottom', CssTextAlign).isValid(); // => false
 validate('left', CssTextAlign).isValid();   // => true
@@ -175,7 +171,7 @@ validate('left', CssTextAlign).isValid();   // => true
 ## Unions
 
 ```js
-var CssLineHeight = union([Num, Str]);
+var CssLineHeight = t.union([t.Number, t.String]);
 
 validate(null, CssLineHeight).isValid();    // => false
 validate(1.4, CssLineHeight).isValid();     // => true
@@ -186,8 +182,8 @@ validate('1.2em', CssLineHeight).isValid(); // => true
 
 ```js
 // a dictionary of numbers
-var Country = enums.of('IT, US', 'Country');
-var Warranty = dict(Country, Num);
+var Country = t.enums.of('IT, US', 'Country');
+var Warranty = t.dict(Country, t.Number);
 
 validate(null, Warranty).isValid();             // => false
 validate({a: 2}, Warranty).isValid();           // => false, ['a'] is not a Country
@@ -195,14 +191,26 @@ validate({US: 2, IT: 'a'}, Warranty).isValid(); // => false, ['IT'] is not a num
 validate({US: 2, IT: 1}, Warranty).isValid();   // => true
 ```
 
-## Nested structures
-
-You can validate structures with arbitrary level of nesting:
+## Intersections
 
 ```js
-var Post = struct({
-  title: Str,
-  content: Str,
+var Min = t.subtype(t.String, function (s) { return s.length > 2; }, 'Min');
+var Max = t.subtype(t.String, function (s) { return s.length < 5; }, 'Max');
+var MinMax = t.intersection([Min, Max], 'MinMax');
+
+MinMax.is('abc'); // => true
+MinMax.is('a'); // => false
+MinMax.is('abcde'); // => false
+```
+
+## Nested structures
+
+You can validate structures with an arbitrary level of nesting:
+
+```js
+var Post = t.struct({
+  title: t.String,
+  content: t.String,
   tags: Words
 });
 
@@ -223,9 +231,9 @@ validate(mypost, Post).firstError();  // => 'tags[1] is `1`, should be a `Str`'
 Let's design the process for a simple sign in form:
 
 ```js
-var SignInInfo = struct({
-  username: Str,
-  password: Str
+var SignInInfo = t.struct({
+  username: t.String,
+  password: t.String
 });
 
 // retrieves values from the UI
@@ -237,7 +245,7 @@ var formValues = {
 // if formValues = {username: null, password: 'password'}
 var result = validate(formValues, SignInInfo);
 result.isValid();     // => false
-result.firstError();  // => 'username is `null`, should be a `Str`'
+result.firstError();  // => 'Invalid value null supplied to /username: String'
 ```
 
 ## JSON schema
@@ -266,9 +274,9 @@ If you don't want to use a JSON Schema validator or it's not applicable, you can
 and the equivalent `tcomb-validation` counterpart:
 
 ```js
-var Schema = struct({
-  foo: Num,
-  bar: enums.of('a b c')
+var Schema = t.struct({
+  foo: t.Number,
+  bar: t.enums.of('a b c')
 });
 ```
 
@@ -283,10 +291,8 @@ var json = {
 validate(json, Schema).isValid(); // => false
 
 // the returned errors are:
-[
-  'foo is `"this is a string, not a number"`, should be a `Num`',
-  'bar is `"this is a string that isn\'t allowed"`, should be a `enums`'
-]
+- Invalid value "this is a string, not a number" supplied to /foo: Number
+- Invalid value "this is a string that isn't allowed" supplied to /bar: "a" | "b" | "c"
 ```
 
 **Note**: A feature missing in standard JSON Schema is the powerful [subtype](#subtypes) syntax.
@@ -301,19 +307,19 @@ validate(json, Schema).isValid(); // => false
 - `value`: an instance of `type` if validation succeded
 
 ```js
-// the definition of `ValidationResult`
-var ValidationResult = struct({
-  errors: list(ValidationError),
-  value: Any
-}, 'ValidationResult');
-
 // the definition of `ValidationError`
-var ValidationError = struct({
-  message: Str,                     // a default message for developers
-  actual: Any,                      // the actual value being validated
-  expected: t.Type,                 // the type expected
-  path: list(t.union([Str, t.Num])) // the path of the value
+var ValidationError = t.struct({
+  message: t.String,                        // a default message for developers
+  actual: t.Any,                            // the actual value being validated
+  expected: t.Function,                     // the type expected
+  path: list(t.union([t.String, t.Number])) // the path of the value
 }, 'ValidationError');
+
+// the definition of `ValidationResult`
+var ValidationResult = t.struct({
+  errors: list(ValidationError),
+  value: t.Any
+}, 'ValidationResult');
 ```
 
 ### #isValid()
@@ -321,7 +327,7 @@ var ValidationError = struct({
 Returns true if there are no errors.
 
 ```js
-validate('a', Str).isValid(); // => true
+validate('a', t.String).isValid(); // => true
 ```
 
 ### #firstError()
@@ -329,13 +335,14 @@ validate('a', Str).isValid(); // => true
 Returns the first error or `null` if validation succeded.
 
 ```js
-validate(1, Str).firstError(); // => 'value is `1`, should be a `Str`'
+validate(1, t.String).firstError(); // => 'value is `1`, should be a `Str`'
 ```
 
-## validate(value, type) -> ValidationResult
+## validate(value, type, [path]) -> ValidationResult
 
 - `value` the value to validate
 - `type` a type defined with the tcomb library
+- `path` an optional prefix added to the errors path
 
 # Tests
 
