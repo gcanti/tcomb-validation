@@ -7,8 +7,15 @@
 > - [Documentation]
 > - [Internal]
 > - [Polish]
+> - [Experimental]
 
 **Note**: Gaps between patch versions are faulty/broken releases.
+**Note**: A feature tagged as Experimental is in a high state of flux, you're at risk of it changing without notice.
+
+## 2.1.1
+
+- **Experimental**
+  - Add support for custom error messages #23
 
 ## v2.1.0
 

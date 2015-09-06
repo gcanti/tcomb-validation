@@ -10,15 +10,24 @@ var ValidationError = t.struct({
   path: t.list(t.union([t.Str, t.Num]))
 }, 'ValidationError');
 
-function getDefaultMessage(actual, expected, path) {
+function getDefaultValidationErrorMessage(actual, expected, path) {
   var expectedName = t.getTypeName(expected);
   var to = path.length ? '/' + path.join('/') + ': ' + expectedName : expectedName;
   return 'Invalid value ' + stringify(actual) + ' supplied to ' + to;
 }
 
-ValidationError.of = function of(actual, expected, path) {
+function getValidationErrorMessage(actual, expected, path) {
+  if (t.Function.is(expected.getValidationErrorMessage)) {
+    return expected.getValidationErrorMessage(actual, path);
+  }
+  else {
+    return getDefaultValidationErrorMessage(actual, expected, path);
+  }
+}
+
+ValidationError.of = function (actual, expected, path) {
   return new ValidationError({
-    message: getDefaultMessage(actual, expected, path),
+    message: getValidationErrorMessage(actual, expected, path),
     actual: actual,
     expected: expected,
     path: path
@@ -30,20 +39,23 @@ var ValidationResult = t.struct({
   value: t.Any
 }, 'ValidationResult');
 
-ValidationResult.prototype.isValid = function isValid() {
+ValidationResult.prototype.isValid = function () {
   return !(this.errors.length);
 };
 
-ValidationResult.prototype.firstError = function firstError() {
+ValidationResult.prototype.firstError = function () {
   return this.isValid() ? null : this.errors[0];
 };
 
-ValidationResult.prototype.toString = function toString() {
-  return this.isValid() ?
-    '[ValidationResult, true, ' + stringify(this.value) + ']' :
-    '[ValidationResult, false, (' + this.errors.map(function errorToString(err) {
+ValidationResult.prototype.toString = function () {
+  if (this.isValid()) {
+    return '[ValidationResult, true, ' + stringify(this.value) + ']';
+  }
+  else {
+    return '[ValidationResult, false, (' + this.errors.map(function (err) {
       return err.message;
     }).join(', ') + ')]';
+  }
 };
 
 function validate(x, type, path) {
@@ -51,10 +63,12 @@ function validate(x, type, path) {
 }
 
 function recurse(x, type, path) {
-  var validator = t.isType(type) ?
-    type.meta.kind :
-    'es6classes';
-  return validators[validator](x, type, path);
+  if (t.isType(type)) {
+    return validators[type.meta.kind](x, type, path);
+  }
+  else {
+    return validators.es6classes(x, type, path);
+  }
 }
 
 var validators = validate.validators = {};
