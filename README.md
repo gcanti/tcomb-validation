@@ -25,6 +25,7 @@ A general purpose JavaScript validation library based on type combinators
   - [Dicts](#dicts)
   - [Intersections](#intersections)
   - [Nested structures](#nested-structures)
+- [Customise error messages](#customise-error-messages)
 - [Use cases](#use-cases)
   - [Form validation](#form-validation)
   - [JSON schema](#json-schema)
@@ -222,6 +223,51 @@ var mypost = {
 
 validate(mypost, Post).isValid();     // => false
 validate(mypost, Post).firstError();  // => 'tags[1] is `1`, should be a `Str`'
+```
+
+# Customise error messages
+
+You can customise the validation error message defining a function `getValidationErrorMessage(value, path)` on the type constructor:
+
+```js
+var ShortString = t.subtype(t.String, function (s) {
+  return s.length < 3;
+});
+
+ShortString.getValidationErrorMessage = function (value) {
+  if (!value) {
+    return 'Required';
+  }
+  if (s.length >= 3) {
+    return 'Too long my friend';
+  }
+};
+
+validate('abc', ShortString).firstError().message; // => 'Too long my friend'
+```
+
+## How to keep DRY?
+
+In order to keep the validation logic in one place, one may define a custom combinator:
+
+```js
+function mysubtype(type, getValidationErrorMessage, name) {
+  var Subtype = t.subtype(type, function (x) {
+    return !t.String.is(getValidationErrorMessage(x));
+  }, name);
+  Subtype.getValidationErrorMessage = getValidationErrorMessage;
+  return Sybtype;
+}
+
+var ShortString = mysubtype(t.String, function (s) {
+  if (!value) {
+    return 'Required';
+  }
+  if (s.length >= 3) {
+    return 'Too long my friend';
+  }
+});
+
 ```
 
 # Use cases
