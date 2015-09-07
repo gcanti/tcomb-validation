@@ -183,8 +183,8 @@ validate('1.2em', CssLineHeight).isValid(); // => true
 
 ```js
 // a dictionary of numbers
-var Country = t.enums.of('IT, US', 'Country');
-var Warranty = t.dict(Country, t.Number);
+var Country = t.enums.of(['IT', 'US'], 'Country');
+var Warranty = t.dict(Country, t.Number, 'Warranty');
 
 validate(null, Warranty).isValid();             // => false
 validate({a: 2}, Warranty).isValid();           // => false, ['a'] is not a Country
