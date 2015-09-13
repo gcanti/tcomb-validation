@@ -29,7 +29,7 @@ A general purpose JavaScript validation library based on type combinators
 - [Use cases](#use-cases)
   - [Form validation](#form-validation)
   - [JSON schema](#json-schema)
-- [Api reference](#api-reference)
+- [API reference](#api-reference)
 
 # Basic usage
 
@@ -38,14 +38,20 @@ A general purpose JavaScript validation library based on type combinators
 The main function is `validate`:
 
 ```js
-validate(value, type, [path]) -> ValidationResult
+validate(value, type, [options]) -> ValidationResult
 ```
 
 - `value` the value to validate
 - `type` a type defined with the [tcomb](https://github.com/gcanti/tcomb) library
-- `path` (optional array) provides a prefix to error paths
+- `options` (optional) is an object with the following keys
+  - `path` path prefix for validation
+  - `context` passed to `getValidationErrorMessage` (useful for i18n)
 
 returns a `ValidationResult` object containing the result of the validation
+
+**Note**.
+
+- `options` can be an array (as `path` prefix) for backward compatibility (deprecated)
 
 Example
 
@@ -227,7 +233,7 @@ validate(mypost, Post).firstError();  // => 'tags[1] is `1`, should be a `Str`'
 
 # Customise error messages
 
-You can customise the validation error message defining a function `getValidationErrorMessage(value, path)` on the type constructor:
+You can customise the validation error message defining a function `getValidationErrorMessage(value, path, context)` on the type constructor:
 
 ```js
 var ShortString = t.subtype(t.String, function (s) {
@@ -384,11 +390,13 @@ Returns the first error or `null` if validation succeded.
 validate(1, t.String).firstError(); // => 'value is `1`, should be a `Str`'
 ```
 
-## validate(value, type, [path]) -> ValidationResult
+## validate(value, type, [options]) -> ValidationResult
 
 - `value` the value to validate
 - `type` a type defined with the tcomb library
-- `path` an optional prefix added to the errors path
+- `options` (optional) is an object with the following keys
+  - `path` path prefix for validation
+  - `context` passed to `getValidationErrorMessage` (useful for i18n)
 
 # Tests
 

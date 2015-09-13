@@ -28,7 +28,7 @@ function success(value) {
 var ok = function (x) { assert.strictEqual(true, x); };
 var eq = assert.deepEqual;
 
-describe('validate()', function () {
+describe('validate(value, type, [options])', function () {
 
   var Point = t.struct({
     x: Num,
@@ -134,10 +134,6 @@ describe('validate()', function () {
     eq(validate(true, Union), failure(true, Union, [], 'Invalid value true supplied to Union', true));
   });
 
-  it('optional path param', function () {
-    eq(validate(1, Str, ['prefix']), failure(1, Str, ['prefix'], 'Invalid value 1 supplied to /prefix: String', 1));
-  });
-
   it('ES6 classes', function () {
     function Class(a) {
       this.a = a;
@@ -215,45 +211,65 @@ describe('validate()', function () {
 
   });
 
-  describe('getValidationErrorMessage(value, path)', function () {
+  describe('options argument', function () {
 
-    var MyString = t.irreducible('MyIrreducible', function (x) {
-      return typeof x === 'string' && x.length > 1;
-    });
-    MyString.getValidationErrorMessage = function (value) {
-      if (!MyString.is(value)) {
-        return 'Invalid string';
-      }
-    };
-
-    var ShortString = t.subtype(t.String, function (s) {
-      return s.length < 3;
-    });
-    ShortString.getValidationErrorMessage = function (value) {
-      if (!ShortString.is(value)) {
-        return 'Too long my friend';
-      }
-    };
-
-    it('should handle custom validation error messages on irreducibles', function () {
-      eq(validate(1, MyString), failure(1, MyString, [], 'Invalid string', 1));
+    it('should handle a path key', function () {
+      eq(validate(1, Str, ['prefix']), failure(1, Str, ['prefix'], 'Invalid value 1 supplied to /prefix: String', 1));
     });
 
-    it('should handle custom validation error messages on subtypes', function () {
-      ShortString.getValidationErrorMessage = function (value) {
-        if (!ShortString.is(value)) {
-          return 'Too long my friend';
-        }
+    it('should handle a context key', function () {
+      var context = {a: 1};
+      var ShortString = t.subtype(t.String, function (s) { return s.length < 3; });
+      ShortString.getValidationErrorMessage = function (value, path, ctx) {
+        assert.strictEqual(ctx, context);
+        return 'mymessage' + ctx.a;
       };
-      eq(validate('aaa', ShortString), failure('aaa', ShortString, [], 'Too long my friend', 'aaa'));
-    });
-
-    it('should handle custom validation error messages on intersections', function () {
-      var Intersection = t.intersection([MyString, ShortString]);
-      eq(validate('', Intersection), failure('', MyString, [], 'Invalid string', ''));
-      eq(validate('aaa', Intersection), failure('aaa', ShortString, [], 'Too long my friend', 'aaa'));
+      eq(validate('abc', ShortString, {context: context}).firstError().message, 'mymessage1');
+      assert.deepEqual(validate('abc', ShortString, {context: context, path: ['a']}).firstError().path, ['a']);
     });
 
   });
 
 });
+
+describe('getValidationErrorMessage(value, context)', function () {
+
+  var MyString = t.irreducible('MyIrreducible', function (x) {
+    return typeof x === 'string' && x.length > 1;
+  });
+  MyString.getValidationErrorMessage = function (value) {
+    if (!MyString.is(value)) {
+      return 'Invalid string';
+    }
+  };
+
+  var ShortString = t.subtype(t.String, function (s) {
+    return s.length < 3;
+  });
+  ShortString.getValidationErrorMessage = function (value) {
+    if (!ShortString.is(value)) {
+      return 'Too long my friend';
+    }
+  };
+
+  it('should handle custom validation error messages on irreducibles', function () {
+    eq(validate(1, MyString), failure(1, MyString, [], 'Invalid string', 1));
+  });
+
+  it('should handle custom validation error messages on subtypes', function () {
+    ShortString.getValidationErrorMessage = function (value) {
+      if (!ShortString.is(value)) {
+        return 'Too long my friend';
+      }
+    };
+    eq(validate('aaa', ShortString), failure('aaa', ShortString, [], 'Too long my friend', 'aaa'));
+  });
+
+  it('should handle custom validation error messages on intersections', function () {
+    var Intersection = t.intersection([MyString, ShortString]);
+    eq(validate('', Intersection), failure('', MyString, [], 'Invalid string', ''));
+    eq(validate('aaa', Intersection), failure('aaa', ShortString, [], 'Too long my friend', 'aaa'));
+  });
+
+});
+
