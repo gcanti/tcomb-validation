@@ -262,7 +262,7 @@ function mysubtype(type, getValidationErrorMessage, name) {
     return !t.String.is(getValidationErrorMessage(x));
   }, name);
   Subtype.getValidationErrorMessage = getValidationErrorMessage;
-  return Sybtype;
+  return Subtype;
 }
 
 var ShortString = mysubtype(t.String, function (s) {
