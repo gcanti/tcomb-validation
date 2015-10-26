@@ -244,7 +244,7 @@ ShortString.getValidationErrorMessage = function (value) {
   if (!value) {
     return 'Required';
   }
-  if (s.length >= 3) {
+  if (value.length >= 3) {
     return 'Too long my friend';
   }
 };
@@ -266,7 +266,7 @@ function mysubtype(type, getValidationErrorMessage, name) {
 }
 
 var ShortString = mysubtype(t.String, function (s) {
-  if (!value) {
+  if (!s) {
     return 'Required';
   }
   if (s.length >= 3) {
