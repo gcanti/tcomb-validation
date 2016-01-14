@@ -12,6 +12,11 @@
 **Note**: Gaps between patch versions are faulty/broken releases.
 **Note**: A feature tagged as Experimental is in a high state of flux, you're at risk of it changing without notice.
 
+## 2.3.0
+
+- **New Feature**
+  - add `strict` option: no additional properties are allowed while validating structs, fix #12
+
 ## 2.2.0
 
 - **New Feature**

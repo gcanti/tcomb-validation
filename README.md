@@ -44,8 +44,9 @@ validate(value, type, [options]) -> ValidationResult
 - `value` the value to validate
 - `type` a type defined with the [tcomb](https://github.com/gcanti/tcomb) library
 - `options` (optional) is an object with the following keys
-  - `path` path prefix for validation
-  - `context` passed to `getValidationErrorMessage` (useful for i18n)
+  - `path: Array<string | number>` path prefix for validation
+  - `context: any` passed to `getValidationErrorMessage` (useful for i18n)
+  - `strict: boolean` (default `false`) if `true` no additional properties are allowed while validating structs
 
 returns a `ValidationResult` object containing the result of the validation
 
@@ -139,7 +140,7 @@ validate(null, Point).isValid();            // => false
 validate({x: 0}, Point).isValid();          // => false, y is missing
 validate({x: 0, y: 'a'}, Point).isValid();  // => false, y is not a number
 validate({x: 0, y: 0}, Point).isValid();    // => true
-
+validate({x: 0, y: 0, z: 0}, Point, { strict: true }).isValid(); // => false, no additional properties are allowed
 ```
 
 ## Lists and tuples
@@ -395,8 +396,9 @@ validate(1, t.String).firstError(); // => 'value is `1`, should be a `Str`'
 - `value` the value to validate
 - `type` a type defined with the tcomb library
 - `options` (optional) is an object with the following keys
-  - `path` path prefix for validation
-  - `context` passed to `getValidationErrorMessage` (useful for i18n)
+  - `path: Array<string | number>` path prefix for validation
+  - `context: any` passed to `getValidationErrorMessage` (useful for i18n)
+  - `strict: boolean` (default `false`) if `true` no additional properties are allowed while validating structs
 
 # Tests
 

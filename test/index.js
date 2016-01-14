@@ -228,6 +228,23 @@ describe('validate(value, type, [options])', function () {
       assert.deepEqual(validate('abc', ShortString, {context: context, path: ['a']}).firstError().path, ['a']);
     });
 
+    it('should handle a strict boolean', function () {
+      eq(validate({x: 0, y: 0}, Point, {strict: true}), success({x: 0, y: 0}));
+      eq(validate({x: 0, y: 0, z: 0}, Point, {strict: true}), failure(0, t.Nil, ['z'], 'Invalid value 0 supplied to /z: Nil', {x: 0, y: 0}));
+      eq(validate({x: 0, y: 0, z: null}, Point, {strict: true}), success({x: 0, y: 0}));
+      eq(validate({x: 0, y: 0, z: undefined}, Point, {strict: true}), success({x: 0, y: 0}));
+    });
+
+    it('should handle a strict boolean with nested structures', function () {
+      var InnerType = t.struct({point: Point});
+      var List = t.list(InnerType);
+      var T = t.subtype(List, function (x) {
+        return x.length >= 2;
+      });
+      eq(validate([{point: {x: 0, y: 0}}, {point: {x: 0, y: 0}}], T, {strict: true}), success([{point: {x: 0, y: 0}}, {point: {x: 0, y: 0}}]));
+      eq(validate([{point: {x: 0, y: 0, z: 0}}, {point: {x: 0, y: 0}}], T, {strict: true}), failure(0, t.Nil, [0, 'point', 'z'], 'Invalid value 0 supplied to /0/point/z: Nil', [{point: {x: 0, y: 0}}, {point: {x: 0, y: 0}}]));
+    });
+
   });
 
 });
