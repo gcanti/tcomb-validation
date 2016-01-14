@@ -153,6 +153,13 @@ validators.struct = function validateStruct(x, type, path, options) {
       ret.errors = ret.errors.concat(prop.errors);
     }
   }
+  if (options.strict) {
+    for (var field in x) {
+      if (x.hasOwnProperty(field) && !props.hasOwnProperty(field) && !t.Nil.is(x[field])) {
+        ret.errors.push(ValidationError.of(x[field], t.Nil, path.concat(field), options.context));
+      }
+    }
+  }
   if (!ret.errors.length) {
     ret.value = new type(ret.value);
   }
