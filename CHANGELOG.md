@@ -12,17 +12,24 @@
 **Note**: Gaps between patch versions are faulty/broken releases.
 **Note**: A feature tagged as Experimental is in a high state of flux, you're at risk of it changing without notice.
 
-## 2.3.0
+## v3.0.0
+
+**Warning**. If you don't rely in your codebase on the property `maybe(MyType)(undefined) === null` this **is not a breaking change** for you.
+
+- **Breaking Change**
+  - upgrade to `tcomb` v3.0.0
+
+## v2.3.0
 
 - **New Feature**
   - add `strict` option: no additional properties are allowed while validating structs, fix #12
 
-## 2.2.0
+## v2.2.0
 
 - **New Feature**
   - replaced `path` argument with `options`, fix #27 (thanks @th0r)
 
-## 2.1.1
+## v2.1.1
 
 - **Experimental**
   - Add support for custom error messages #23
