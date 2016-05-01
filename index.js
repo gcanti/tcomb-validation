@@ -4,10 +4,10 @@ var t = require('tcomb');
 var stringify = t.stringify;
 
 var ValidationError = t.struct({
-  message: t.Str,
+  message: t.String,
   actual: t.Any,
   expected: t.Any,
-  path: t.list(t.union([t.Str, t.Num]))
+  path: t.list(t.union([t.String, t.Number]))
 }, 'ValidationError');
 
 function getDefaultValidationErrorMessage(actual, expected, path) {
@@ -94,7 +94,7 @@ validators.enums = function validateIrreducible(x, type, path, options) {
 validators.list = function validateList(x, type, path, options) {
 
   // x should be an array
-  if (!t.Arr.is(x)) {
+  if (!t.Array.is(x)) {
     return {value: x, errors: [ValidationError.of(x, type, path, options.context)]};
   }
 
@@ -134,7 +134,7 @@ validators.maybe = function validateMaybe(x, type, path, options) {
 validators.struct = function validateStruct(x, type, path, options) {
 
   // x should be an object
-  if (!t.Obj.is(x)) {
+  if (!t.Object.is(x)) {
     return {value: x, errors: [ValidationError.of(x, type, path, options.context)]};
   }
 
@@ -172,7 +172,7 @@ validators.tuple = function validateTuple(x, type, path, options) {
   var len = types.length;
 
   // x should be an array of at most `len` items
-  if (!t.Arr.is(x) || x.length > len) {
+  if (!t.Array.is(x) || x.length > len) {
     return {value: x, errors: [ValidationError.of(x, type, path, options.context)]};
   }
 
@@ -189,7 +189,7 @@ validators.tuple = function validateTuple(x, type, path, options) {
 validators.dict = function validateDict(x, type, path, options) {
 
   // x should be an object
-  if (!t.Obj.is(x)) {
+  if (!t.Object.is(x)) {
     return {value: x, errors: [ValidationError.of(x, type, path, options.context)]};
   }
 
@@ -210,7 +210,7 @@ validators.dict = function validateDict(x, type, path, options) {
 
 validators.union = function validateUnion(x, type, path, options) {
   var ctor = type.dispatch(x);
-  return t.Func.is(ctor) ?
+  return t.Function.is(ctor) ?
     recurse(x, ctor, path.concat(type.meta.types.indexOf(ctor)), options) :
     {value: x, errors: [ValidationError.of(x, type, path, options.context)]};
 };
@@ -225,6 +225,31 @@ validators.intersection = function validateIntersection(x, type, path, options) 
   for (var i = 0; i < len; i++) {
     var item = recurse(x, types[i], path, options);
     ret.errors = ret.errors.concat(item.errors);
+  }
+  return ret;
+};
+
+validators['interface'] = function validateInterface(x, type, path, options) { // eslint-disable-line dot-notation
+
+  // x should be an object
+  if (!t.Object.is(x)) {
+    return {value: x, errors: [ValidationError.of(x, type, path, options.context)]};
+  }
+
+  var ret = {value: {}, errors: []};
+  var props = type.meta.props;
+  // every item should be of type `props[name]`
+  for (var name in props) {
+    var prop = recurse(x[name], props[name], path.concat(name), options);
+    ret.value[name] = prop.value;
+    ret.errors = ret.errors.concat(prop.errors);
+  }
+  if (options.strict) {
+    for (var field in x) {
+      if (!props.hasOwnProperty(field) && !t.Nil.is(x[field])) {
+        ret.errors.push(ValidationError.of(x[field], t.Nil, path.concat(field), options.context));
+      }
+    }
   }
   return ret;
 };

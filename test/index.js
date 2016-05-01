@@ -2,8 +2,6 @@
 var assert = require('assert');
 var t = require('../index');
 
-var Str = t.Str;
-var Num = t.Num;
 var validate = t.validate;
 var ValidationResult = t.ValidationResult;
 
@@ -31,19 +29,24 @@ var eq = assert.deepEqual;
 describe('validate(value, type, [options])', function () {
 
   var Point = t.struct({
-    x: Num,
-    y: Num
+    x: t.Number,
+    y: t.Number
   }, 'Point');
 
+  var PointInterface = t.inter({
+    x: t.Number,
+    y: t.Number
+  }, 'PointInterface');
+
   it('irriducible', function () {
-    eq(validate('a', Str), success('a'));
-    eq(validate(1, Num), success(1));
+    eq(validate('a', t.String), success('a'));
+    eq(validate(1, t.Number), success(1));
     eq(validate(true, t.Bool), success(true));
     eq(validate(/a/, t.Re), success(/a/));
     var d = new Date();
     eq(validate(d, t.Dat), success(d));
     ok(validate(function () {}, t.Func).isValid());
-    eq(validate(1, Str), failure(1, Str, [], 'Invalid value 1 supplied to String', 1));
+    eq(validate(1, t.String), failure(1, t.String, [], 'Invalid value 1 supplied to String', 1));
   });
 
   it('enums', function () {
@@ -55,26 +58,34 @@ describe('validate(value, type, [options])', function () {
   it('struct', function () {
     eq(validate({x: 0, y: 0}, Point), success({x: 0, y: 0}));
     ok(validate({x: 0, y: 0}, Point).value instanceof Point);
-    eq(validate({x: 0, y: 'a'}, Point), failure('a', Num, ['y'], 'Invalid value "a" supplied to /y: Number', {x: 0, y: 'a'}));
+    eq(validate({x: 0, y: 'a'}, Point), failure('a', t.Number, ['y'], 'Invalid value "a" supplied to /y: Number', {x: 0, y: 'a'}));
     eq(validate(new Point({x: 0, y: 0}), Point), success({x: 0, y: 0}));
   });
 
+  it('interface', function () {
+    eq(validate({x: 0, y: 0}, PointInterface), success({x: 0, y: 0}));
+    eq(validate({x: 0, y: 0, z: 0}, PointInterface), success({x: 0, y: 0}));
+    eq(validate({x: 0, y: 'a'}, PointInterface), failure('a', t.Number, ['y'], 'Invalid value "a" supplied to /y: Number', {x: 0, y: 'a'}));
+    eq(validate({x: 0}, PointInterface), failure(undefined, t.Number, ['y'], 'Invalid value undefined supplied to /y: Number', {x: 0, y: undefined}));
+    eq(validate(PointInterface({x: 0, y: 0}), PointInterface), success({x: 0, y: 0}));
+  });
+
   it('list', function () {
-    var Tags = t.list(Str, 'Tags');
+    var Tags = t.list(t.String, 'Tags');
     eq(validate(['a'], Tags), success(['a']));
     eq(validate(1, Tags), failure(1, Tags, [], 'Invalid value 1 supplied to Tags', 1));
-    eq(validate([1], Tags), failure(1, Str, [0], 'Invalid value 1 supplied to /0: String', [1]));
+    eq(validate([1], Tags), failure(1, t.String, [0], 'Invalid value 1 supplied to /0: String', [1]));
     var Points = t.list(Point);
     eq(validate([{x: 0, y: 0}], Points), success([{x: 0, y: 0}]));
     ok(validate([{x: 0, y: 0}], Points).value[0] instanceof Point);
   });
 
-  it('subtype', function () {
-    var URL = t.subtype(Str, function (s) { return s.indexOf('http://') === 0; }, 'URL');
+  it('refinement', function () {
+    var URL = t.refinement(t.String, function (s) { return s.indexOf('http://') === 0; }, 'URL');
     eq(validate('http://gcanti.github.io', URL), success('http://gcanti.github.io'));
-    eq(validate(1, URL), failure(1, Str, [], 'Invalid value 1 supplied to String', 1));
+    eq(validate(1, URL), failure(1, t.String, [], 'Invalid value 1 supplied to String', 1));
     eq(validate('a', URL), failure('a', URL, [], 'Invalid value "a" supplied to URL', 'a'));
-    var PointQ1 = t.subtype(Point, function (p) {
+    var PointQ1 = t.refinement(Point, function (p) {
       return p.x >= 0 && p.y >= 0;
     });
     eq(validate({x: 0, y: 0}, PointQ1), success({x: 0, y: 0}));
@@ -82,33 +93,33 @@ describe('validate(value, type, [options])', function () {
   });
 
   it('maybe', function () {
-    var Maybe = t.maybe(Str, 'Maybe');
+    var Maybe = t.maybe(t.String, 'Maybe');
     eq(validate(null, Maybe), success(null));
     eq(validate('a', Maybe), success('a'));
-    eq(validate(1, Maybe), failure(1, Str, [], 'Invalid value 1 supplied to String', 1));
+    eq(validate(1, Maybe), failure(1, t.String, [], 'Invalid value 1 supplied to String', 1));
     eq(validate(null, t.maybe(Point)), success(null));
     eq(validate({x: 0, y: 0}, Point), success({x: 0, y: 0}));
     ok(validate({x: 0, y: 0}, Point).value instanceof Point);
   });
 
   it('tuple', function () {
-    var Tuple = t.tuple([Str, Num], 'Tuple');
+    var Tuple = t.tuple([t.String, t.Number], 'Tuple');
     eq(validate(1, Tuple), failure(1, Tuple, [], 'Invalid value 1 supplied to Tuple', 1));
     eq(validate(['a', 1], Tuple), success(['a', 1]));
     eq(validate(['a', 1, 2], Tuple), failure(['a', 1, 2], Tuple, [], 'Invalid value [\n  \"a\",\n  1,\n  2\n] supplied to Tuple', ['a', 1, 2]));
-    eq(validate(['a'], Tuple), failure(undefined, Num, [1], 'Invalid value undefined supplied to /1: Number', ['a', undefined]));
-    eq(validate(['a', 'b'], Tuple), failure('b', Num, [1], 'Invalid value "b" supplied to /1: Number', ['a', 'b']));
-    Tuple = t.tuple([Str, Point], 'Tuple');
+    eq(validate(['a'], Tuple), failure(undefined, t.Number, [1], 'Invalid value undefined supplied to /1: Number', ['a', undefined]));
+    eq(validate(['a', 'b'], Tuple), failure('b', t.Number, [1], 'Invalid value "b" supplied to /1: Number', ['a', 'b']));
+    Tuple = t.tuple([t.String, Point], 'Tuple');
     eq(validate(['a', {x: 0, y: 0}], Tuple), success(['a', {x: 0, y: 0}]));
     ok(validate(['a', {x: 0, y: 0}], Tuple).value[1] instanceof Point);
     eq(validate(['a', 'b'], Tuple), failure('b', Point, [1], 'Invalid value "b" supplied to /1: Point', ['a', 'b']));
   });
 
   it('dict', function () {
-    var Key = t.subtype(Str, function (k) {
+    var Key = t.refinement(t.String, function (k) {
       return k.length >= 2;
     }, 'Key');
-    var Value = t.subtype(Num, function (n) {
+    var Value = t.refinement(t.Number, function (n) {
       return n >= 0;
     }, 'Value');
     var Dict = t.dict(Key, Value, 'Dict');
@@ -122,13 +133,13 @@ describe('validate(value, type, [options])', function () {
     ok(validate({aa: {x: 0, y: 0}}, Dict).value.aa instanceof Point);
     eq(validate({a: {x: 0, y: 0}}, Dict), failure('a', Key, ['a'], 'Invalid value "a" supplied to /a: Key', {a: {x: 0, y: 0}}));
     ok(validate({a: {x: 0, y: 0}}, Dict).value.a instanceof Point);
-    eq(validate({aa: {x: 0, y: 'a'}}, Dict), failure('a', Num, ['aa', 'y'], 'Invalid value "a" supplied to /aa/y: Number', {aa: {x: 0, y: 'a'}}));
-    Dict = t.dict(Str, Str);
-    eq(validate({a: 'a', b: 0}, Dict), failure(0, Str, ['b'], 'Invalid value 0 supplied to /b: String', {a: 'a', b: 0}));
+    eq(validate({aa: {x: 0, y: 'a'}}, Dict), failure('a', t.Number, ['aa', 'y'], 'Invalid value "a" supplied to /aa/y: Number', {aa: {x: 0, y: 'a'}}));
+    Dict = t.dict(t.String, t.String);
+    eq(validate({a: 'a', b: 0}, Dict), failure(0, t.String, ['b'], 'Invalid value 0 supplied to /b: String', {a: 'a', b: 0}));
   });
 
   it('union', function () {
-    var Union = t.union([Str, Num], 'Union');
+    var Union = t.union([t.String, t.Number], 'Union');
     eq(validate(1, Union), success(1));
     eq(validate('a', Union), success('a'));
     eq(validate(true, Union), failure(true, Union, [], 'Invalid value true supplied to Union', true));
@@ -146,8 +157,8 @@ describe('validate(value, type, [options])', function () {
   });
 
   it('intersection', function () {
-    var Min = t.subtype(t.String, function (s) { return s.length > 2; }, 'Min');
-    var Max = t.subtype(t.String, function (s) { return s.length < 5; }, 'Max');
+    var Min = t.refinement(t.String, function (s) { return s.length > 2; }, 'Min');
+    var Max = t.refinement(t.String, function (s) { return s.length < 5; }, 'Max');
     var MinMax = t.intersection([Min, Max], 'MinMax');
 
     eq(validate(1, MinMax), {
@@ -155,13 +166,13 @@ describe('validate(value, type, [options])', function () {
         {
           message: 'Invalid value 1 supplied to String',
           actual: 1,
-          expected: Str,
+          expected: t.String,
           path: []
         },
         {
           message: 'Invalid value 1 supplied to String',
           actual: 1,
-          expected: Str,
+          expected: t.String,
           path: []
         }
       ],
@@ -214,12 +225,12 @@ describe('validate(value, type, [options])', function () {
   describe('options argument', function () {
 
     it('should handle a path key', function () {
-      eq(validate(1, Str, ['prefix']), failure(1, Str, ['prefix'], 'Invalid value 1 supplied to /prefix: String', 1));
+      eq(validate(1, t.String, ['prefix']), failure(1, t.String, ['prefix'], 'Invalid value 1 supplied to /prefix: String', 1));
     });
 
     it('should handle a context key', function () {
       var context = {a: 1};
-      var ShortString = t.subtype(t.String, function (s) { return s.length < 3; });
+      var ShortString = t.refinement(t.String, function (s) { return s.length < 3; });
       ShortString.getValidationErrorMessage = function (value, path, ctx) {
         assert.strictEqual(ctx, context);
         return 'mymessage' + ctx.a;
@@ -233,12 +244,13 @@ describe('validate(value, type, [options])', function () {
       eq(validate({x: 0, y: 0, z: 0}, Point, {strict: true}), failure(0, t.Nil, ['z'], 'Invalid value 0 supplied to /z: Nil', {x: 0, y: 0}));
       eq(validate({x: 0, y: 0, z: null}, Point, {strict: true}), success({x: 0, y: 0}));
       eq(validate({x: 0, y: 0, z: undefined}, Point, {strict: true}), success({x: 0, y: 0}));
+      eq(validate({x: 0, y: 0, z: 0}, PointInterface, {strict: true}), failure(0, t.Nil, ['z'], 'Invalid value 0 supplied to /z: Nil', {x: 0, y: 0}));
     });
 
     it('should handle a strict boolean with nested structures', function () {
       var InnerType = t.struct({point: Point});
       var List = t.list(InnerType);
-      var T = t.subtype(List, function (x) {
+      var T = t.refinement(List, function (x) {
         return x.length >= 2;
       });
       eq(validate([{point: {x: 0, y: 0}}, {point: {x: 0, y: 0}}], T, {strict: true}), success([{point: {x: 0, y: 0}}, {point: {x: 0, y: 0}}]));
@@ -260,7 +272,7 @@ describe('getValidationErrorMessage(value, context)', function () {
     }
   };
 
-  var ShortString = t.subtype(t.String, function (s) {
+  var ShortString = t.refinement(t.String, function (s) {
     return s.length < 3;
   });
   ShortString.getValidationErrorMessage = function (value) {
