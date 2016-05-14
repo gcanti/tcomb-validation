@@ -22,7 +22,8 @@
   },
   "devDependencies": {
     "eslint": "0.22.1",
-    "mocha": "2.2.5"
+    "mocha": "2.2.5",
+    "tcomb": "gcanti/tcomb#master"
   },
   "tags": [
     "tcomb",

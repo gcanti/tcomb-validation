@@ -153,9 +153,10 @@ validators.struct = function validateStruct(x, type, path, options) {
       ret.errors = ret.errors.concat(prop.errors);
     }
   }
-  if (options.strict) {
+  var strict = options.hasOwnProperty('strict') ? options.strict : type.meta.strict;
+  if (strict) {
     for (var field in x) {
-      if (x.hasOwnProperty(field) && !props.hasOwnProperty(field) && !t.Nil.is(x[field])) {
+      if (x.hasOwnProperty(field) && !props.hasOwnProperty(field)) {
         ret.errors.push(ValidationError.of(x[field], t.Nil, path.concat(field), options.context));
       }
     }
@@ -244,7 +245,8 @@ validators['interface'] = function validateInterface(x, type, path, options) { /
     ret.value[name] = prop.value;
     ret.errors = ret.errors.concat(prop.errors);
   }
-  if (options.strict) {
+  var strict = options.hasOwnProperty('strict') ? options.strict : type.meta.strict;
+  if (strict) {
     for (var field in x) {
       if (!props.hasOwnProperty(field) && !t.Nil.is(x[field])) {
         ret.errors.push(ValidationError.of(x[field], t.Nil, path.concat(field), options.context));

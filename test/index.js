@@ -68,6 +68,14 @@ describe('validate(value, type, [options])', function () {
     eq(validate({x: 0, y: 'a'}, PointInterface), failure('a', t.Number, ['y'], 'Invalid value "a" supplied to /y: Number', {x: 0, y: 'a'}));
     eq(validate({x: 0}, PointInterface), failure(undefined, t.Number, ['y'], 'Invalid value undefined supplied to /y: Number', {x: 0, y: undefined}));
     eq(validate(PointInterface({x: 0, y: 0}), PointInterface), success({x: 0, y: 0}));
+    // prototype
+    var Serializable = t.inter({
+      serialize: t.Function
+    }, 'Serializable');
+    function SerializableImpl() {}
+    SerializableImpl.prototype.serialize = function () {};
+    eq(validate(new SerializableImpl(), Serializable), success({ serialize: SerializableImpl.prototype.serialize }));
+    eq(validate({}, Serializable), failure(undefined, t.Function, ['serialize'], 'Invalid value undefined supplied to /serialize: Function', { serialize: undefined }));
   });
 
   it('list', function () {
@@ -242,8 +250,8 @@ describe('validate(value, type, [options])', function () {
     it('should handle a strict boolean', function () {
       eq(validate({x: 0, y: 0}, Point, {strict: true}), success({x: 0, y: 0}));
       eq(validate({x: 0, y: 0, z: 0}, Point, {strict: true}), failure(0, t.Nil, ['z'], 'Invalid value 0 supplied to /z: Nil', {x: 0, y: 0}));
-      eq(validate({x: 0, y: 0, z: null}, Point, {strict: true}), success({x: 0, y: 0}));
-      eq(validate({x: 0, y: 0, z: undefined}, Point, {strict: true}), success({x: 0, y: 0}));
+      eq(validate({x: 0, y: 0, z: null}, Point, {strict: true}), failure(null, t.Nil, ['z'], 'Invalid value null supplied to /z: Nil', {x: 0, y: 0}));
+      eq(validate({x: 0, y: 0, z: undefined}, Point, {strict: true}), failure(undefined, t.Nil, ['z'], 'Invalid value undefined supplied to /z: Nil', {x: 0, y: 0}));
       eq(validate({x: 0, y: 0, z: 0}, PointInterface, {strict: true}), failure(0, t.Nil, ['z'], 'Invalid value 0 supplied to /z: Nil', {x: 0, y: 0}));
     });
 
@@ -257,6 +265,22 @@ describe('validate(value, type, [options])', function () {
       eq(validate([{point: {x: 0, y: 0, z: 0}}, {point: {x: 0, y: 0}}], T, {strict: true}), failure(0, t.Nil, [0, 'point', 'z'], 'Invalid value 0 supplied to /0/point/z: Nil', [{point: {x: 0, y: 0}}, {point: {x: 0, y: 0}}]));
     });
 
+  });
+
+  it('should handle a strict struct', function () {
+    var StrictStruct = t.struct({
+      name: t.String
+    }, { name: 'StrictStruct', strict: true });
+    eq(validate({name: 'Giulio'}, StrictStruct), success({name: 'Giulio'}));
+    eq(validate({name: 'Giulio', a: 1}, StrictStruct), failure(1, t.Nil, ['a'], 'Invalid value 1 supplied to /a: Nil', {name: 'Giulio'}));
+  });
+
+  it('should handle a strict interface', function () {
+    var StrictInterface = t.inter({
+      name: t.String
+    }, { name: 'StrictStruct', strict: true });
+    eq(validate({name: 'Giulio'}, StrictInterface), success({name: 'Giulio'}));
+    eq(validate({name: 'Giulio', a: 1}, StrictInterface), failure(1, t.Nil, ['a'], 'Invalid value 1 supplied to /a: Nil', {name: 'Giulio'}));
   });
 
 });
