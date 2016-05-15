@@ -112,22 +112,24 @@ validate(1, t.RegExp).isValid();    // => false
 validate(/^a/, t.RegExp).isValid(); // => true
 ```
 
-## Subtypes
+## Refinements
 
-You can express more fine-grained contraints with the `subtype` syntax:
+You can express more fine-grained contraints with the `refinement` syntax:
 
 ```js
 // a predicate is a function with signature: (x) -> boolean
 var predicate = function (x) { return x >= 0; };
 
 // a positive number
-var Positive = t.subtype(t.Number, predicate);
+var Positive = t.refinement(t.Number, predicate);
 
 validate(-1, Positive).isValid(); // => false
 validate(1, Positive).isValid();  // => true
 ```
 
 ## Objects
+
+### Structs
 
 ```js
 // an object with two numerical properties
@@ -141,6 +143,24 @@ validate({x: 0}, Point).isValid();          // => false, y is missing
 validate({x: 0, y: 'a'}, Point).isValid();  // => false, y is not a number
 validate({x: 0, y: 0}, Point).isValid();    // => true
 validate({x: 0, y: 0, z: 0}, Point, { strict: true }).isValid(); // => false, no additional properties are allowed
+```
+
+### Interfaces
+
+**Differences from structs**
+
+- also checks prototype keys
+
+```js
+var Serializable = t.interface({
+  serialize: t.Function
+});
+
+validate(new Point(...), Serializable).isValid(); // => false
+
+Point.prototype.serialize = function () { ... }
+
+validate(new Point(...), Serializable).isValid(); // => true
 ```
 
 ## Lists and tuples
