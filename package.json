@@ -1,6 +1,6 @@
 {
   "name": "tcomb-validation",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "General purpose validation library for JavaScript",
   "main": "index.js",
   "scripts": {
@@ -22,7 +22,8 @@
   },
   "devDependencies": {
     "eslint": "0.22.1",
-    "mocha": "2.2.5"
+    "mocha": "2.2.5",
+    "tcomb": "gcanti/tcomb#master"
   },
   "tags": [
     "tcomb",
