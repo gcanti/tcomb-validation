@@ -3,6 +3,8 @@
 var t = require('tcomb');
 var stringify = t.stringify;
 
+var noobj = {};
+
 var ValidationError = t.struct({
   message: t.String,
   actual: t.Any,
@@ -145,10 +147,16 @@ validators.struct = function validateStruct(x, type, path, options) {
 
   var ret = {value: {}, errors: []};
   var props = type.meta.props;
+  var defaultProps = type.meta.defaultProps || noobj;
   // every item should be of type `props[name]`
   for (var name in props) {
     if (props.hasOwnProperty(name)) {
-      var prop = recurse(x[name], props[name], path.concat(name), options);
+      var actual = x[name];
+      // apply defaults
+      if (actual === undefined) {
+        actual = defaultProps[name];
+      }
+      var prop = recurse(actual, props[name], path.concat(name), options);
       ret.value[name] = prop.value;
       ret.errors = ret.errors.concat(prop.errors);
     }

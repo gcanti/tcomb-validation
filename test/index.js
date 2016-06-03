@@ -62,6 +62,19 @@ describe('validate(value, type, [options])', function () {
     eq(validate(new Point({x: 0, y: 0}), Point), success({x: 0, y: 0}));
   });
 
+  it('struct default props', function () {
+    var DefaultPoint = t.struct({
+      x: t.Number,
+      y: t.Number
+    }, { defaultProps: { x: 0 } });
+    eq(validate({y: 0}, DefaultPoint), success({x: 0, y: 0}));
+    eq(validate({x: 1, y: 0}, DefaultPoint), success({x: 1, y: 0}));
+    ok(validate({y: 0}, DefaultPoint).value instanceof DefaultPoint);
+    eq(validate({y: 'a'}, DefaultPoint), failure('a', t.Number, ['y'], 'Invalid value "a" supplied to /y: Number', {x: 0, y: 'a'}));
+    eq(validate({x: 1, y: 'a'}, DefaultPoint), failure('a', t.Number, ['y'], 'Invalid value "a" supplied to /y: Number', {x: 1, y: 'a'}));
+    eq(validate(new DefaultPoint({y: 0}), Point), success({x: 0, y: 0}));
+  });
+
   it('interface', function () {
     eq(validate({x: 0, y: 0}, PointInterface), success({x: 0, y: 0}));
     eq(validate({x: 0, y: 0, z: 0}, PointInterface), success({x: 0, y: 0}));

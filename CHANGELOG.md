@@ -12,10 +12,15 @@
 **Note**: Gaps between patch versions are faulty/broken releases.
 **Note**: A feature tagged as Experimental is in a high state of flux, you're at risk of it changing without notice.
 
+## v3.2.0
+
+- **New Feature**
+  - add support for default props (tcomb v3.2)
+
 ## v3.1.0
 
 - **New Feature**
-  - support tcomb's `interface` combinator
+  - add support for `interface` combinator (tcomb v3.1)
 
 ## v3.0.0
 
