@@ -241,6 +241,20 @@ describe('validate(value, type, [options])', function () {
       value: {name: 'aa'}
     });
 
+    var StructIntersection = t.intersection([t.struct({string: Min}), t.struct({string: Max})], 'StructIntersection');
+
+    eq(validate({string: 'Test'}, StructIntersection), {
+      errors: [
+        {
+          message: 'Invalid value {\n  \"string\": \"Test\"\n} supplied to StructIntersection',
+          actual: {string: 'Test'},
+          expected: StructIntersection,
+          path: []
+        }
+      ],
+      value: {string: 'Test'}
+    });
+
   });
 
   describe('options argument', function () {
