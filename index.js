@@ -230,10 +230,17 @@ validators.intersection = function validateIntersection(x, type, path, options) 
   var len = types.length;
 
   var ret = {value: x, errors: []};
+  var nrOfStructs = 0;
   // x should be of type `types[i]` for all i
   for (var i = 0; i < len; i++) {
+    if (types[i].meta.kind === 'struct') {
+      nrOfStructs++;
+    }
     var item = recurse(x, types[i], path, options);
     ret.errors = ret.errors.concat(item.errors);
+  }
+  if (nrOfStructs > 1) {
+    ret.errors.push(ValidationError.of(x, type, path, options.context));
   }
   return ret;
 };
