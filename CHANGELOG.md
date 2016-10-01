@@ -12,6 +12,11 @@
 **Note**: Gaps between patch versions are faulty/broken releases.
 **Note**: A feature tagged as Experimental is in a high state of flux, you're at risk of it changing without notice.
 
+## v3.2.2
+
+- **Bug Fix**
+  - maybe value is not converted from `undefined` to `null` after validation, fix #44 (@gcanti)
+
 ## v3.2.1
 
 - **Bug Fix**
