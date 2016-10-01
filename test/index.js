@@ -116,6 +116,8 @@ describe('validate(value, type, [options])', function () {
   it('maybe', function () {
     var Maybe = t.maybe(t.String, 'Maybe');
     eq(validate(null, Maybe), success(null));
+    eq(validate(undefined, Maybe), success(undefined));
+    assert.strictEqual(validate(undefined, Maybe).value, undefined);
     eq(validate('a', Maybe), success('a'));
     eq(validate(1, Maybe), failure(1, t.String, [], 'Invalid value 1 supplied to String', 1));
     eq(validate(null, t.maybe(Point)), success(null));

@@ -129,7 +129,7 @@ validators.subtype = function validateSubtype(x, type, path, options) {
 
 validators.maybe = function validateMaybe(x, type, path, options) {
   return t.Nil.is(x) ?
-    {value: null, errors: []} :
+    {value: x, errors: []} :
     recurse(x, type.meta.type, path, options);
 };
 
