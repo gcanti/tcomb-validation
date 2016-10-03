@@ -7,7 +7,7 @@ A general purpose JavaScript validation library based on type combinators
 # Features
 
 - concise yet expressive syntax
-- validates native types, subtypes, objects, lists and tuples, enums, unions, dicts, intersections
+- validates native types, refinements, objects, lists and tuples, enums, unions, dicts, intersections
 - validates structures with arbitrary level of nesting
 - detailed informations on failed validations
 - lightweight alternative to JSON Schema
@@ -17,7 +17,7 @@ A general purpose JavaScript validation library based on type combinators
 
 - [Basic usage](#basic-usage)
   - [Primitives](#primitives)
-  - [Subtypes](#subtypes)
+  - [Refinements](#refinements)
   - [Objects](#objects)
   - [Lists and tuples](#lists-and-tuples)
   - [Enums](#enums)
@@ -222,8 +222,8 @@ validate({US: 2, IT: 1}, Warranty).isValid();   // => true
 ## Intersections
 
 ```js
-var Min = t.subtype(t.String, function (s) { return s.length > 2; }, 'Min');
-var Max = t.subtype(t.String, function (s) { return s.length < 5; }, 'Max');
+var Min = t.refinement(t.String, function (s) { return s.length > 2; }, 'Min');
+var Max = t.refinement(t.String, function (s) { return s.length < 5; }, 'Max');
 var MinMax = t.intersection([Min, Max], 'MinMax');
 
 MinMax.is('abc'); // => true
@@ -257,7 +257,7 @@ validate(mypost, Post).firstError();  // => 'tags[1] is `1`, should be a `Str`'
 You can customise the validation error message defining a function `getValidationErrorMessage(value, path, context)` on the type constructor:
 
 ```js
-var ShortString = t.subtype(t.String, function (s) {
+var ShortString = t.refinement(t.String, function (s) {
   return s.length < 3;
 });
 
@@ -279,7 +279,7 @@ In order to keep the validation logic in one place, one may define a custom comb
 
 ```js
 function mysubtype(type, getValidationErrorMessage, name) {
-  var Subtype = t.subtype(type, function (x) {
+  var Subtype = t.refinement(type, function (x) {
     return !t.String.is(getValidationErrorMessage(x));
   }, name);
   Subtype.getValidationErrorMessage = getValidationErrorMessage;
@@ -368,7 +368,7 @@ validate(json, Schema).isValid(); // => false
 - Invalid value "this is a string that isn't allowed" supplied to /bar: "a" | "b" | "c"
 ```
 
-**Note**: A feature missing in standard JSON Schema is the powerful [subtype](#subtypes) syntax.
+**Note**: A feature missing in standard JSON Schema is the powerful [refinement](#refinements) syntax.
 
 # Api reference
 
