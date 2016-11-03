@@ -68,8 +68,8 @@ You can inspect the result to quickly identify what's wrong:
 
 ```js
 var result = validate(1, t.String);
-result.isValid();     // => false
-result.firstError();  // => 'Invalid value 1 supplied to String'
+result.isValid();             // => false
+result.firstError().message;  // => 'Invalid value 1 supplied to String'
 
 // see `result.errors` to inspect all errors
 ```
@@ -248,8 +248,8 @@ var mypost = {
   tags: ['validation', 1] // <-- ouch!
 };
 
-validate(mypost, Post).isValid();     // => false
-validate(mypost, Post).firstError();  // => 'tags[1] is `1`, should be a `Str`'
+validate(mypost, Post).isValid();             // => false
+validate(mypost, Post).firstError().message;  // => 'tags[1] is `1`, should be a `Str`'
 ```
 
 # Customise error messages
@@ -317,8 +317,8 @@ var formValues = {
 
 // if formValues = {username: null, password: 'password'}
 var result = validate(formValues, SignInInfo);
-result.isValid();     // => false
-result.firstError();  // => 'Invalid value null supplied to /username: String'
+result.isValid();             // => false
+result.firstError().message;  // => 'Invalid value null supplied to /username: String'
 ```
 
 ## JSON schema
@@ -405,10 +405,10 @@ validate('a', t.String).isValid(); // => true
 
 ### #firstError()
 
-Returns the first error or `null` if validation succeded.
+Returns an object that contains an error message or `null` if validation succeeded.
 
 ```js
-validate(1, t.String).firstError(); // => 'value is `1`, should be a `Str`'
+validate(1, t.String).firstError().message; // => 'value is `1`, should be a `Str`'
 ```
 
 ## validate(value, type, [options]) -> ValidationResult
