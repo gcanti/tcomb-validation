@@ -6,7 +6,7 @@ var stringify = t.stringify;
 var noobj = {};
 
 var ValidationError = t.struct({
-  message: t.String,
+  message: t.Any,
   actual: t.Any,
   expected: t.Any,
   path: t.list(t.union([t.String, t.Number]))
@@ -55,7 +55,7 @@ ValidationResult.prototype.toString = function () {
   }
   else {
     return '[ValidationResult, false, (' + this.errors.map(function (err) {
-      return err.message;
+      return stringify(err.message);
     }).join(', ') + ')]';
   }
 };

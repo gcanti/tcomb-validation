@@ -353,5 +353,30 @@ describe('getValidationErrorMessage(value, context)', function () {
     eq(validate('aaa', Intersection), failure('aaa', ShortString, [], 'Too long my friend', 'aaa'));
   });
 
+  it('should allow to return custom validation objects', function () {
+    ShortString.getValidationErrorMessage = function (value) {
+      if (!ShortString.is(value)) {
+        return { foo: 'bar' };
+      }
+    };
+    eq(validate('aaa', ShortString), failure('aaa', ShortString, [], { foo: 'bar' }, 'aaa'));
+  });
+
 });
 
+describe('ValidationResult.toString', function () {
+  it('should return string representation when valid', function () {
+    const res = success(true);
+    eq('[ValidationResult, true, true]', res.toString());
+  });
+
+  it('should return string representation when invalid', function () {
+    const res = failure(1, t.String, [], 'Invalid value 1 supplied to String', 1);
+    eq('[ValidationResult, false, ("Invalid value 1 supplied to String")]', res.toString());
+  });
+
+  it('should return string representation when invalid with custom message', function () {
+    const res = failure(1, t.String, [], { very: 'error' }, 1);
+    eq('[ValidationResult, false, ({\n  "very": "error"\n})]', res.toString());
+  });
+});
