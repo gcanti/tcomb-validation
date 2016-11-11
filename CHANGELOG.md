@@ -12,6 +12,11 @@
 **Note**: Gaps between patch versions are faulty/broken releases.
 **Note**: A feature tagged as Experimental is in a high state of flux, you're at risk of it changing without notice.
 
+## v3.3.0
+
+- **New Feature**
+  - ValidationError: relax message type (from `String` to `Any`), fix #54 (@pigoz)
+
 ## v3.2.2
 
 - **Bug Fix**
