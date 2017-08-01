@@ -1,8 +1,13 @@
 {
   "name": "tcomb-validation",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "description": "General purpose validation library for JavaScript",
   "main": "index.js",
+  "typings": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts"
+  ],
   "scripts": {
     "lint": "eslint index.js",
     "test": "npm run lint && mocha"

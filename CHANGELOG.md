@@ -12,6 +12,11 @@
 **Note**: Gaps between patch versions are faulty/broken releases.
 **Note**: A feature tagged as Experimental is in a high state of flux, you're at risk of it changing without notice.
 
+## v3.4.0
+
+- **New Feature**
+  - Add TypeScript definitions (@RedRoserade)
+
 ## v3.3.0
 
 - **New Feature**
