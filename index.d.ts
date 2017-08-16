@@ -2,8 +2,9 @@ import * as t from 'tcomb';
 
 export * from 'tcomb';
 
+// Augment 'tcomb': Add getValidationErrorMessage.
 declare module 'tcomb' {
-    export interface Type<T> extends t.Type<T> {
+    export interface Type<T> {
         /**
          * Allows customization of the error message for a type.
          * 
@@ -56,7 +57,7 @@ export interface ValidationResult {
      */
     firstError(): ValidationError | null;
     /**
-     * Contains the validation errors, if any.
+     * Contains the validation errors, if any. Empty if none.
      */
     errors: Array<ValidationError>;
 }
